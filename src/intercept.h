@@ -202,14 +202,21 @@ void mprotect_asm_wrappers(void);
  */
 void activate_patches(struct intercept_desc *desc);
 
-#define SYSCALL_INS_SIZE 2
-#define JUMP_INS_SIZE 5
-#define CALL_OPCODE 0xe8
-#define JMP_OPCODE 0xe9
-#define SHORT_JMP_OPCODE 0xeb
-#define PUSH_IMM_OPCODE 0x68
-#define NOP_OPCODE 0x90
-#define INT3_OPCODE 0xCC
+#define ECALL_INS_SIZE 4
+/*
+ * 16 bytes are actually needed to write 4 instructions. The 1st one decreases
+ * sp value, the 2nd one stores one tmp reg into the stack, the 3rd one uses the
+ * saved register to write part of the destination address and the 4th one is
+ * actually the jump summing its immediate value to the just wrote register to
+ * calculate desination of the jump
+ */
+#define JUMP_INS_SIZE 16
+// #define CALL_OPCODE 0xe8
+// #define JMP_OPCODE 0xe9
+// #define SHORT_JMP_OPCODE 0xeb
+// #define PUSH_IMM_OPCODE 0x68
+// #define NOP_OPCODE 0x90
+// #define INT3_OPCODE 0xCC
 
 bool is_overwritable_nop(const struct intercept_disasm_result *ins);
 

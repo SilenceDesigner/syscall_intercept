@@ -353,8 +353,7 @@ find_jumps_in_section_rela(struct intercept_desc *desc, Elf64_Shdr *section,
 
 	for (size_t i = 0; i < sym_count; ++i) {
 		switch (ELF64_R_TYPE(syms[i].r_info)) {
-			case R_X86_64_RELATIVE:
-			case R_X86_64_RELATIVE64:
+			case R_RISCV_RELATIVE:
 				/* Relocation type: "Adjust by program base" */
 
 				debug_dump("jump target: %lx\n",
@@ -431,7 +430,8 @@ add_new_patch(struct intercept_desc *desc)
 bool
 is_overwritable_nop(const struct intercept_disasm_result *ins)
 {
-	return ins->is_nop && ins->length >= 2 + 5;
+	// return ins->is_nop && ins->length >= 2 + 5;
+	return false; // dummy function: NOP are 4 bytes on RISC-V
 }
 
 /*
@@ -483,11 +483,11 @@ crawl_text(struct intercept_desc *desc)
 			continue;
 		}
 
-		if (result.has_ip_relative_opr)
-			mark_jump(desc, result.rip_ref_addr);
+		// if (result.has_ip_relative_opr)
+		// 	mark_jump(desc, result.rip_ref_addr);
 
-		if (is_overwritable_nop(&result))
-			mark_nop(desc, code, result.length);
+		// if (is_overwritable_nop(&result))		 // NOP is overwritable if its size is >= 7 bytes;
+		// 	mark_nop(desc, code, result.length); // RISC-V NOPs are fixed to 4-byte length, so it's never overwritable
 
 		/*
 		 * Generate a new patch description, if:
@@ -523,7 +523,7 @@ crawl_text(struct intercept_desc *desc)
 			patch->preceding_ins_2 = prevs[0];
 			patch->preceding_ins = prevs[1];
 			patch->following_ins = result;
-			patch->syscall_addr = code - SYSCALL_INS_SIZE;
+			patch->syscall_addr = code - ECALL_INS_SIZE;
 
 			ptrdiff_t syscall_offset = patch->syscall_addr -
 			    (desc->text_start - desc->text_offset);
@@ -702,7 +702,7 @@ find_syscalls(struct intercept_desc *desc)
 	    (uintptr_t)desc->text_start,
 	    (uintptr_t)desc->text_end);
 	allocate_jump_table(desc);
-	allocate_nop_table(desc);
+	// allocate_nop_table(desc); // should be able to ditch without any loss, since RISC-V could not use NOPs as x86_64 intended to
 
 	for (Elf64_Half i = 0; i < desc->symbol_tables.count; ++i)
 		find_jumps_in_section_syms(desc,
