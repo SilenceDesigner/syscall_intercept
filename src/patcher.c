@@ -99,7 +99,7 @@ static unsigned char *
 create_absolute_jump(unsigned char *from, void *to)
 {
 	uint32_t *instructions = (uint32_t)from;
-	instructions[0] = 0xfe810113; // addi sp, sp, -24
+	instructions[0] = 0xff010113; // addi sp, sp, -16
 	instructions[1] = 0x00613023; // sd t1, 0(sp)
 	instructions[2] = 0x00713423; // sd t2, 8(sp)
 	instructions[3] = 0x01c13823; // sd t3, 16(sp)
@@ -116,7 +116,7 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[18] = 0x00013303; // ld t1, 0(sp)
 	instructions[19] = 0x00813383; // ld t2, 8(sp)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
-	instructions[21] = 0x01810113; // addi sp, sp, 24
+	instructions[21] = 0x01010113; // addi sp, sp, 16
 	instructions[22] = 0x00028067; // jalr zero, t0, 0
 	return instructions + 23;
 }
@@ -503,7 +503,7 @@ size_t asm_wrapper_tmpl_size;
 static ptrdiff_t o_patch_desc_addr;
 static ptrdiff_t o_wrapper_level1_addr;
 
-bool intercept_routine_must_save_ymm;
+bool intercept_routine_must_save_ymm = false; // temporarily hardcoded
 
 /*
  * init_patcher
@@ -684,9 +684,9 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
 		if (patch->uses_prev_ins_2) {
-			*((uint32_t *)(*dst)) = 0x00013283; // ld t0, 0(sp)
+			*((uint32_t *)(*dst)) = 0x00813283; // ld t0, 8(sp)
 			*dst += 4;
-			*((uint32_t *)(*dst)) = 0x00810113; // addi sp, sp, 8
+			*((uint32_t *)(*dst)) = 0x01010113; // addi sp, sp, 16
 			*dst += 4;
 			*dst = relocate_instruction(*dst, &patch->preceding_ins_2);
 		}
@@ -805,8 +805,8 @@ create_j(unsigned char *from, void *to)
     lui |= lui_imm_field;
     jalr |= (jalr_imm_field << 20);
 
-		instructions[0] = 0xff810113; // addi sp, sp, -8
-		instructions[1] = 0x00513023; // sd t0, 0(sp)
+		instructions[0] = 0xff010113; // addi sp, sp, -16
+		instructions[1] = 0x00513423; // sd t0, 8(sp)
 		instructions[2] = lui; // lui t0, 0x.....
 		instructions[3] = jalr; // jalr ra, t0, 0x...
 
