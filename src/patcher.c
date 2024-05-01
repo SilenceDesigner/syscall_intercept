@@ -82,8 +82,12 @@
 
 /* The size of a trampoline jump, 64-bit address loading process into a register
  * (which requires 14 instructions to encode directly in machine code) + JALR.
+ * These are preceeded and succeeded by storing and restoring of tmp registers
+ * used for the creation of the absolute jump. We can't clobber them since two
+ * instructions that were placed before the original ecall still must be
+ * executed.
  */
-enum { TRAMPOLINE_SIZE = 15 * 4 };
+enum { TRAMPOLINE_SIZE = 23 * 4 };
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
 
@@ -95,18 +99,26 @@ static unsigned char *
 create_absolute_jump(unsigned char *from, void *to)
 {
 	uint32_t *instructions = (uint32_t)from;
-	create_load_uint64t_into_a6(from,(uint64_t)value);
-	 instructions[5] = 0x7ffff337;
-	 instructions[6] = 0x7ff06393;
-	 instructions[7] = 0x00139393;
-	 instructions[8] = 0x0013e393;
-	 instructions[9] = 0x00736333;
-	instructions[10] = 0x00131313;
-	instructions[11] = 0x00136313;
-	instructions[12] = 0x0062f2b3;
-	instructions[13] = 0x00586833;
-	instructions[14] = 0x00080067;
-	return instructions + 15;
+	instructions[0] = 0xfe810113; // addi sp, sp, -24
+	instructions[1] = 0x00613023; // sd t1, 0(sp)
+	instructions[2] = 0x00713423; // sd t2, 8(sp)
+	instructions[3] = 0x01c13823; // sd t3, 16(sp)
+	create_load_uint64t_into_t0(instructions + 4,(uint64_t)value);
+	instructions[9] = 0x7ffff337; // lui t1, 0x7ffff
+	instructions[10] = 0x7ff06393; // ori t2, zero, 0x7ff
+	instructions[11] = 0x00139393; // slli t2, t2, 1
+	instructions[12] = 0x0013e393; // ori t2, t2, 1
+	instructions[13] = 0x00736333; // or t1, t1, t2
+	instructions[14] = 0x00131313; // slli t1, t1, 1
+	instructions[15] = 0x00136313; // ori t1, t1, 1
+	instructions[16] = 0x006e7e33; // and t3, t3, t1
+	instructions[17] = 0x01c2e2b3; // or t0, t0, t3
+	instructions[18] = 0x00013303; // ld t1, 0(sp)
+	instructions[19] = 0x00813383; // ld t2, 8(sp)
+	instructions[20] = 0x01013e03; // ld t3, 16(sp)
+	instructions[21] = 0x01810113; // addi sp, sp, 24
+	instructions[22] = 0x00028067; // jalr zero, t0, 0
+	return instructions + 23;
 }
 
 /*
@@ -584,7 +596,7 @@ create_ret_from_template(unsigned char *code)
 }
 
 /*
- * create_load_uint64t_into_a6
+ * create_load_uint64t_into_t0
  * Generates the first 5 instructions (LUI,ADDI,SLLI,LUI,ADDI) of a convoluted
  * 14 instructions sequence that assign a 64 bit constant to a register.
  * See intercept_template.S for the following 9 at
@@ -592,7 +604,7 @@ create_ret_from_template(unsigned char *code)
  * intercept_asm_wrapper_wrapper_level1_addr as well).
  */
 static void
-create_load_uint64t_into_a6(uint8_t *code, uint64_t value)
+create_load_uint64t_into_t0(uint8_t *code, uint64_t value)
 {
 
 	uint32_t *instructions = (uint32_t *)code;
@@ -609,9 +621,9 @@ create_load_uint64t_into_a6(uint8_t *code, uint64_t value)
     }
   }
 
-	instructions[0] = 0x00000837 | lui_imm_field; // lui a6, 0x.....
-  instructions[1] = 0x00080813 | (addi_imm_field << 20); // addi a6, a6, 0x...
-  instructions[2] = 0x02081813; // slli a6, a6, 32 // could ditch this line as long its placeholder in intercept_template.S isn't different at all
+	instructions[0] = 0x000002b7 | lui_imm_field; // lui t0, 0x.....
+  instructions[1] = 0x00028293 | (addi_imm_field << 20); // addi t0, t0, 0x...
+  instructions[2] = 0x02029293; // slli t0, t0, 32 // could ditch this line as long its placeholder in intercept_template.S isn't different at all
 
 	lui_imm_field = lower_32 & 0xfffff000;
 	addi_imm_field = 0;
@@ -623,8 +635,8 @@ create_load_uint64t_into_a6(uint8_t *code, uint64_t value)
 		}
 	}
 
-	instructions[3] = 0x000002b7 | lui_imm_field; // lui t0, 0x.....
-  instructions[4] = 0x00028293 | (addi_imm_field << 20); // addi t0, t0, 0x...
+	instructions[3] = 0x00000e37 | lui_imm_field; // lui t3, 0x.....
+  instructions[4] = 0x000e0e13 | (addi_imm_field << 20); // addi t3, t3, 0x...
 
 }
 
@@ -667,6 +679,7 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 {
 	/* Create a new copy of the template */
 	patch->asm_wrapper = *dst;
+	uint32_t *instructions = (uint32_t *)(*dst);
 
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
@@ -681,8 +694,8 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	}
 
 	memcpy(*dst, intercept_asm_wrapper_tmpl, asm_wrapper_tmpl_size);
-	create_load_uint64t_into_a6(*dst + o_patch_desc_addr, (uintptr_t)patch); // why the uintptr_t cast? What if the address is not representable on 32 bit?
-	create_load_uint64t_into_a6(*dst + o_wrapper_level1_addr,
+	create_load_uint64t_into_t0(*dst + o_patch_desc_addr, (uintptr_t)patch); // why the uintptr_t cast? What if the address is not representable on 32 bit?
+	create_load_uint64t_into_t0(*dst + o_wrapper_level1_addr,
 				(uintptr_t)&intercept_wrapper);
 	*dst += asm_wrapper_tmpl_size;
 
@@ -739,7 +752,7 @@ create_j(unsigned char *from, void *to)
 	 */
 	ptrdiff_t delta = ((unsigned char *)to) - from;
 	uint32_t *instructions = (uint32_t)from;
-	uint32_t ebreak = 0x00100073; // ebreak instruction
+	uint32_t nop = 0x00000013; // nop instruction
 	debug_dump("%p: svc -> b %ld\t# %p\n", from, delta, to);
 
 	const ptrdiff_t JAL_OFFSET = 1 << 20;
@@ -758,22 +771,21 @@ create_j(unsigned char *from, void *to)
 
 		/* extracting 20 bits to be encoded in jal instruction */
 		uint32_t tmp = (uint32_t) delta & 0x000fffff;
-		uint32_t jal = 0x0000006f; /* jal instruction with offset = 0 */
+		uint32_t jal = 0x000000ef; /* jal instruction with offset = 0 and rd = ra */
 		jal |= ((tmp & 0x3ff) << 21); /* shifting imm[9:0] into jal[30:21] */
 		jal |= ((tmp & 0x400) << 10); /* shifting imm[10] into jal[20] */
 		jal |= ((tmp & 0x7f800) << 1); /* shifting imm[18:11] into jal[19:12] */
 		jal |= ((tmp & 0x80000) << 12); /* shifting imm[19] into jal[31] */
 
-		// *((uint32_t *)from) = jal; replaced by following lines
 		instructions[0] = jal;
-		instructions[1] = ebreak;
-		instructions[2] = ebreak;
-		instructions[3] = ebreak;
+		instructions[1] = nop;
+		instructions[2] = nop;
+		instructions[3] = nop;
 
 	} else if (delta <= JALR_MAX_OFFSET || delta >= JALR_MIN_OFFSET) {
 
 		uint32_t lui = 0x000002b7; // encoding t0 as rd
-		uint32_t jalr = 0x00028067; // encoding zero as rd and t0 as rs1
+		uint32_t jalr = 0x000280e7; // encoding ra as rd and t0 as rs1
 		uint32_t jalr_imm_field = 0;
     uint32_t lui_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
 
@@ -793,13 +805,10 @@ create_j(unsigned char *from, void *to)
     lui |= lui_imm_field;
     jalr |= (jalr_imm_field << 20);
 
-		instructions[0] = lui; // lui t0, 0x.....
-		instructions[1] = jalr; // jalr zero, t0, 0x...
-		instructions[2] = ebreak;
-		instructions[3] = ebreak;
-		// *((uint32_t *)from) = lui; // lui t0, 0x.....
-		// from += 4;
-		// *(uint32_t *)from) = jalr; // jalr zero, t0, 0x...
+		instructions[0] = 0xff810113; // addi sp, sp, -8
+		instructions[1] = 0x00513023; // sd t0, 0(sp)
+		instructions[2] = lui; // lui t0, 0x.....
+		instructions[3] = jalr; // jalr ra, t0, 0x...
 
 	} else {
 		xabort("create_j distance check");
