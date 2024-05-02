@@ -135,67 +135,67 @@ intercept_disasm_destroy(struct intercept_disasm_context *context)
  * check_op - checks a single operand of an instruction, looking
  * for RIP relative addressing.
  */
-static void
-check_op(struct intercept_disasm_result *result, cs_x86_op *op,
-		const unsigned char *code)
-{
-	/*
-	 * the address the RIP register is going to contain during the
-	 * execution of this instruction
-	 */
-	const unsigned char *rip = code + result->length;
-
-	if (op->type == RISCV_OP_REG) {
-		if (op->reg == X86_REG_IP || op->reg == X86_REG_RIP) {
-			/*
-			 * Example: mov %rip, %rax
-			 */
-			result->has_ip_relative_opr = true;
-			result->rip_disp = 0;
-			result->rip_ref_addr = rip;
-		}
-		if (result->is_jump) {
-			/*
-			 * Example: jmp *(%rax)
-			 */
-			/*
-			 * An indirect jump can't have arguments other
-			 * than a register - therefore the asserts.
-			 * ( I'm 99.99% sure this is true )
-			 */
-			assert(!result->is_rel_jump);
-			result->is_indirect_jump = true;
-		}
-	} else if (op->type == X86_OP_MEM) {
-		if (op->mem.base == X86_REG_IP ||
-				op->mem.base == X86_REG_RIP ||
-				op->mem.index == X86_REG_IP ||
-				op->mem.index == X86_REG_RIP ||
-				result->is_jump) {
-			result->has_ip_relative_opr = true;
-			assert(!result->is_indirect_jump);
-
-			if (result->is_jump)
-				result->is_rel_jump = true;
-
-			assert(op->mem.disp <= INT32_MAX);
-			assert(op->mem.disp >= INT32_MIN);
-
-			result->rip_disp = (int32_t)op->mem.disp;
-			result->rip_ref_addr = rip + result->rip_disp;
-		}
-	} else if (op->type == X86_OP_IMM) {
-		if (result->is_jump) {
-			assert(!result->is_indirect_jump);
-			result->has_ip_relative_opr = true;
-			result->is_rel_jump = true;
-			result->rip_ref_addr = (void *)op->imm;
-
-			result->rip_disp =
-			    (int32_t)((unsigned char *)op->imm - rip);
-		}
-	}
-}
+// static void
+// check_op(struct intercept_disasm_result *result, cs_x86_op *op,
+// 		const unsigned char *code)
+// {
+// 	/*
+// 	 * the address the RIP register is going to contain during the
+// 	 * execution of this instruction
+// 	 */
+// 	const unsigned char *rip = code + result->length;
+//
+// 	if (op->type == RISCV_OP_REG) {
+// 		if (op->reg == X86_REG_IP || op->reg == X86_REG_RIP) {
+// 			/*
+// 			 * Example: mov %rip, %rax
+// 			 */
+// 			result->has_ip_relative_opr = true;
+// 			result->rip_disp = 0;
+// 			result->rip_ref_addr = rip;
+// 		}
+// 		if (result->is_jump) {
+// 			/*
+// 			 * Example: jmp *(%rax)
+// 			 */
+// 			/*
+// 			 * An indirect jump can't have arguments other
+// 			 * than a register - therefore the asserts.
+// 			 * ( I'm 99.99% sure this is true )
+// 			 */
+// 			assert(!result->is_rel_jump);
+// 			result->is_indirect_jump = true;
+// 		}
+// 	} else if (op->type == X86_OP_MEM) {
+// 		if (op->mem.base == X86_REG_IP ||
+// 				op->mem.base == X86_REG_RIP ||
+// 				op->mem.index == X86_REG_IP ||
+// 				op->mem.index == X86_REG_RIP ||
+// 				result->is_jump) {
+// 			result->has_ip_relative_opr = true;
+// 			assert(!result->is_indirect_jump);
+//
+// 			if (result->is_jump)
+// 				result->is_rel_jump = true;
+//
+// 			assert(op->mem.disp <= INT32_MAX);
+// 			assert(op->mem.disp >= INT32_MIN);
+//
+// 			result->rip_disp = (int32_t)op->mem.disp;
+// 			result->rip_ref_addr = rip + result->rip_disp;
+// 		}
+// 	} else if (op->type == X86_OP_IMM) {
+// 		if (result->is_jump) {
+// 			assert(!result->is_indirect_jump);
+// 			result->has_ip_relative_opr = true;
+// 			result->is_rel_jump = true;
+// 			result->rip_ref_addr = (void *)op->imm;
+// 
+// 			result->rip_disp =
+// 			    (int32_t)((unsigned char *)op->imm - rip);
+// 		}
+// 	}
+// }
 
 /*
  * intercept_disasm_next_instruction - Examines a single instruction
@@ -244,7 +244,7 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 #endif
 
 	switch (context->insn->id) {
-		case RISCV_INS_BEQ: // these are jumps and their destination is calculated as PC + offset;
+		case RISCV_INS_BEQ: // PC-relative jumps
 		case RISCV_INS_BGE:
 		case RISCV_INS_BGEU:
 		case RISCV_INS_BLT:
@@ -258,39 +258,57 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 			result.has_ip_relative_opr = true;
 			break;
 		case RISCV_INS_JALR:
-			result.is_ret = true;
-			cs_riscv_op *op;
-			for (uint8_t op_i = 0; result.is_ret &&
-					op_i < context->insn->detail->riscv.op_count; ++op_i) {
-						op = context->insn->detail->riscv.operands + op_i;
-						switch (op->type) {
-							case RISCV_OP_REG:
-								if (op->reg != RISCV_REG_ZERO || op->reg != RISCV_REG_RA) {
-									result.is_ret = false;
-								}
-								break;
-							case RISCV_OP_IMM:
-								if (op->imm != 0) {
-									result.is_ret = false;
-								}
-								break;
-							case RISCV_OP_MEM:
-								if (op->mem.base != RISCV_REG_RA || op->mem.disp != 0) {
-									result.is_ret = false;
-								}
-								break;
-							default:
-								result.is_ret = false;
-								break;
-						}
-					}
-					if (!result.is_ret) {
-						result.is_jump = true;
-					}
+			result.is_jump = true;
+			// result.is_ret = true;
+			// cs_riscv_op *op;
+			// for (uint8_t op_i = 0; result.is_ret &&
+			// 		op_i < context->insn->detail->riscv.op_count; ++op_i) {
+			// 			op = context->insn->detail->riscv.operands + op_i;
+			// 			switch (op->type) {
+			// 				case RISCV_OP_REG:
+			// 					if (op->reg != RISCV_REG_ZERO || op->reg != RISCV_REG_RA) {
+			// 						result.is_ret = false;
+			// 					}
+			// 					break;
+			// 				case RISCV_OP_IMM:
+			// 					if (op->imm != 0) {
+			// 						result.is_ret = false;
+			// 					}
+			// 					break;
+			// 				case RISCV_OP_MEM:
+			// 					if (op->mem.base != RISCV_REG_RA || op->mem.disp != 0) {
+			// 						result.is_ret = false;
+			// 					}
+			// 					break;
+			// 				default:
+			// 					result.is_ret = false;
+			// 					break;
+			// 			}
+			// 		}
+			// 		if (!result.is_ret) {
+			// 			result.is_jump = true;
+			// 		}
 			break;
 		default:
 			result.is_jump = false;
 			result.has_ip_relative_opr = false;
+			result.uses_ra = false;
+			cs_riscv_op *op;
+			for (uint8_t op_i = 0; !result.uses_ra &&
+					 op_i < context->insn->detail->riscv.op_count; ++op_i) {
+				op = context->insn->detail->riscv.operands + op_i;
+				switch (op->type) {
+					case RISCV_OP_REG:
+						result.uses_ra = op->reg == RISCV_REG_RA;
+						break;
+					case RISCV_OP_MEM:
+						result.uses_ra = op->mem.base == RISCV_REG_RA;
+						break;
+					default:
+						//result.is_ret = false;
+						break;
+				}
+			}
 			break;
 	}
 

@@ -67,6 +67,9 @@ struct intercept_disasm_result {
 	/* as of now this only refers to endbr64 */
 	bool is_endbr;
 
+	/* Flag marking if ra is one of the operands of the instruction */
+	bool uses_ra;
+
 	/*
 	 * Flag marking lea instructions setting a 64 bit register to a
 	 * RIP relative address. They can be relocated -- but by simple memcpy.

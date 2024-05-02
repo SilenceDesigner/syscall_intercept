@@ -220,43 +220,43 @@ is_nop_in_range(unsigned char *address, const struct range *nop)
  * This routine essentially initializes the uses_nop_trampoline and
  * the nop_trampoline fields of a struct patch_desc.
  */
-static void
-assign_nop_trampoline(struct intercept_desc *desc,
-		struct patch_desc *patch,
-		size_t *next_nop_i)
-{
-	struct range *nop = desc->nop_table + *next_nop_i;
-
-	if (*next_nop_i >= desc->nop_count) {
-		patch->uses_nop_trampoline = false;
-		return; /* no more nops available */
-	}
-
-	/*
-	 * Consider a nop instruction, to use as trampoline, but only
-	 * if a two byte jump in the place of the syscall can jump
-	 * to the proposed trampoline. Check if the nop is:
-	 *  1) at an address too low
-	 *  2) close enough for a two byte jump
-	 *  3) at an address too high
-	 */
-
-	if (is_nop_in_range(patch->syscall_addr, nop)) {
-		patch->uses_nop_trampoline = true;
-		patch->nop_trampoline = *nop;
-		++(*next_nop_i);
-		return; /* found a nop in range to use as trampoline */
-	}
-
-	if (nop->address > patch->syscall_addr) {
-		patch->uses_nop_trampoline = false;
-		return; /* nop is too far ahead */
-	}
-
-	/* nop is too far behind, try the next nop */
-	++(*next_nop_i);
-	assign_nop_trampoline(desc, patch, next_nop_i);
-}
+// static void
+// assign_nop_trampoline(struct intercept_desc *desc,
+// 		struct patch_desc *patch,
+// 		size_t *next_nop_i)
+// {
+// 	struct range *nop = desc->nop_table + *next_nop_i;
+//
+// 	if (*next_nop_i >= desc->nop_count) {
+// 		patch->uses_nop_trampoline = false;
+// 		return; /* no more nops available */
+// 	}
+//
+// 	/*
+// 	 * Consider a nop instruction, to use as trampoline, but only
+// 	 * if a two byte jump in the place of the syscall can jump
+// 	 * to the proposed trampoline. Check if the nop is:
+// 	 *  1) at an address too low
+// 	 *  2) close enough for a two byte jump
+// 	 *  3) at an address too high
+// 	 */
+//
+// 	if (is_nop_in_range(patch->syscall_addr, nop)) {
+// 		patch->uses_nop_trampoline = true;
+// 		patch->nop_trampoline = *nop;
+// 		++(*next_nop_i);
+// 		return; /* found a nop in range to use as trampoline */
+// 	}
+//
+// 	if (nop->address > patch->syscall_addr) {
+// 		patch->uses_nop_trampoline = false;
+// 		return; /* nop is too far ahead */
+// 	}
+//
+// 	/* nop is too far behind, try the next nop */
+// 	++(*next_nop_i);
+// 	assign_nop_trampoline(desc, patch, next_nop_i);
+// }
 
 /*
  * is_copiable_before_syscall
@@ -296,7 +296,8 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
 	    ins.is_endbr ||
-	    ins.is_syscall);
+	    ins.is_syscall ||
+			ins.uses_ra);
 }
 
 
@@ -549,36 +550,36 @@ init_patcher(void)
  * the reg_bits value must contain the X86 encoding of the register.
  * Returns a pointer to the char right after the generated instruction.
  */
-static unsigned char *
-create_movabs(unsigned char *code, uint64_t value, unsigned char reg_bits)
-{
-	assert(reg_bits < 16);
-
-	unsigned char *bytes = (unsigned char *)&value;
-
-	*code++ = 0x48 | (reg_bits >> 3); /* REX prefix */
-	*code++ = 0xb8 | (reg_bits & 7); /* opcode */
-	*code++ = bytes[0];
-	*code++ = bytes[1];
-	*code++ = bytes[2];
-	*code++ = bytes[3];
-	*code++ = bytes[4];
-	*code++ = bytes[5];
-	*code++ = bytes[6];
-	*code++ = bytes[7];
-
-	return code;
-}
+// static unsigned char *
+// create_movabs(unsigned char *code, uint64_t value, unsigned char reg_bits)
+// {
+// 	assert(reg_bits < 16);
+//
+// 	unsigned char *bytes = (unsigned char *)&value;
+//
+// 	*code++ = 0x48 | (reg_bits >> 3); /* REX prefix */
+// 	*code++ = 0xb8 | (reg_bits & 7); /* opcode */
+// 	*code++ = bytes[0];
+// 	*code++ = bytes[1];
+// 	*code++ = bytes[2];
+// 	*code++ = bytes[3];
+// 	*code++ = bytes[4];
+// 	*code++ = bytes[5];
+// 	*code++ = bytes[6];
+// 	*code++ = bytes[7];
+//
+// 	return code;
+// }
 
 /*
  * create_movabs_r11
  * Generates a movabs instruction moving a value into the R11 register.
  */
-static unsigned char *
-create_movabs_r11(unsigned char *code, uint64_t value)
-{
-	return create_movabs(code, value, 11);
-}
+// static unsigned char *
+// create_movabs_r11(unsigned char *code, uint64_t value)
+// {
+// 	return create_movabs(code, value, 11);
+// }
 
 /*
  * create_ret_from_template
@@ -712,27 +713,27 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
  * Generates a 2 byte jump instruction. The to address must be reachable
  * using an 8 bit displacement.
  */
-static void
-create_short_jump(unsigned char *from, unsigned char *to)
-{
-	ptrdiff_t d = to - (from + 2);
-
-	if (d < - 128 || d > 127)
-		xabort("create_short_jump distance check");
-
-	from[0] = SHORT_JMP_OPCODE;
-	from[1] = (unsigned char)((char)d);
-}
+// static void
+// create_short_jump(unsigned char *from, unsigned char *to)
+// {
+// 	ptrdiff_t d = to - (from + 2);
+//
+// 	if (d < - 128 || d > 127)
+// 		xabort("create_short_jump distance check");
+//
+// 	from[0] = SHORT_JMP_OPCODE;
+// 	from[1] = (unsigned char)((char)d);
+// }
 
 /*
  * after_nop -- get the address of the instruction
  * following the nop.
  */
-static unsigned char *
-after_nop(const struct range *nop)
-{
-	return nop->address + nop->size;
-}
+// static unsigned char *
+// after_nop(const struct range *nop)
+// {
+// 	return nop->address + nop->size;
+// }
 
 /*
  * create_j(from, to)
