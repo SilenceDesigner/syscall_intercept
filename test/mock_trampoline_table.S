@@ -49,60 +49,31 @@
 # cases -- the only thing that matters, is to have these at predictable
 # addresses.
 
-.intel_syntax noprefix
-
-.global trampoline_table;
-.global trampoline_table_end;
+.globl trampoline_table;
+.globl trampoline_table_end;
 
 .data
 
 trampoline_table:
-dst0:		jmp     [rip]
-		.space 8, 0
-dst1:		jmp     [rip]
-		.space 8, 0
-dst2:		jmp     [rip]
-		.space 8, 0
-dst3:		jmp     [rip]
-		.space 8, 0
-dst4:		jmp     [rip]
-		.space 8, 0
-dst5:		jmp     [rip]
-		.space 8, 0
-dst6:		jmp     [rip]
-		.space 8, 0
-dst7:		jmp     [rip]
-		.space 8, 0
-dst8:		jmp     [rip]
-		.space 8, 0
-dst9:		jmp     [rip]
-		.space 8, 0
-dst10:		jmp     [rip]
-		.space 8, 0
-dst11:		jmp     [rip]
-		.space 8, 0
-dst12:		jmp     [rip]
-		.space 8, 0
-dst13:		jmp     [rip]
-		.space 8, 0
-dst14:		jmp     [rip]
-		.space 8, 0
-dst15:		jmp     [rip]
-		.space 8, 0
-dst16:		jmp     [rip]
-		.space 8, 0
-dst17:		jmp     [rip]
-		.space 8, 0
-dst18:		jmp     [rip]
-		.space 8, 0
-dst19:		jmp     [rip]
-		.space 8, 0
-dst20:		jmp     [rip]
-		.space 8, 0
-dst21:		jmp     [rip]
-		.space 8, 0
-dst22:		jmp     [rip]
-		.space 8, 0
-dst23:		jmp     [rip]
-		.space 8, 0
+dst0:
+	addi sp, sp, -16
+	sd t1, 0(sp)
+	sd t2, 8(sp)
+	sd t3, 16(sp)
+	.space 20, 0
+	lui t1, 0x7ffff
+	ori t2, zero, 0x7ff
+	slli t2, t2, 1
+	ori t2, t2, 1
+	or t1, t1, t2
+	slli t1, t1, 1
+	ori t1, t1, 1
+	and t3, t3, t1
+	or t0, t0, t3
+	ld t1, 0(sp)
+	ld t2, 8(sp)
+	ld t3, 16(sp)
+	addi sp, sp, 16
+	jalr zero, t0, 0
+
 trampoline_table_end:

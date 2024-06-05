@@ -41,13 +41,16 @@
 .text
 
 text_start:
-		jmp     dst0
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
-		int3
+		jal dst0
+		addi zero, zero, 0 # nop
+		addi zero, zero, 0 # nop
+		addi zero, zero, 0 # nop
+
+		#otherwise
+
+		# addi sp, sp, -16
+		# sd t0, 8(sp)
+		# lui t0, 0x.....
+		# jalr ra, t0, 0x...
+
 text_end:
