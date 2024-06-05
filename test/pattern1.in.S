@@ -43,7 +43,8 @@
 .text
 
 text_start:
-		mov     rax, 1
-		syscall
-		cmp     rax, -1
+		addi a7, zero, 1
+		addi a7, a7, zero
+		ecall
+		addi zero, zero, zero
 text_end:
