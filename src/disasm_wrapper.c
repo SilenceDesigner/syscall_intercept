@@ -132,72 +132,6 @@ intercept_disasm_destroy(struct intercept_disasm_context *context)
 }
 
 /*
- * check_op - checks a single operand of an instruction, looking
- * for RIP relative addressing.
- */
-// static void
-// check_op(struct intercept_disasm_result *result, cs_x86_op *op,
-// 		const unsigned char *code)
-// {
-// 	/*
-// 	 * the address the RIP register is going to contain during the
-// 	 * execution of this instruction
-// 	 */
-// 	const unsigned char *rip = code + result->length;
-//
-// 	if (op->type == RISCV_OP_REG) {
-// 		if (op->reg == X86_REG_IP || op->reg == X86_REG_RIP) {
-// 			/*
-// 			 * Example: mov %rip, %rax
-// 			 */
-// 			result->has_ip_relative_opr = true;
-// 			result->rip_disp = 0;
-// 			result->rip_ref_addr = rip;
-// 		}
-// 		if (result->is_jump) {
-// 			/*
-// 			 * Example: jmp *(%rax)
-// 			 */
-// 			/*
-// 			 * An indirect jump can't have arguments other
-// 			 * than a register - therefore the asserts.
-// 			 * ( I'm 99.99% sure this is true )
-// 			 */
-// 			assert(!result->is_rel_jump);
-// 			result->is_indirect_jump = true;
-// 		}
-// 	} else if (op->type == X86_OP_MEM) {
-// 		if (op->mem.base == X86_REG_IP ||
-// 				op->mem.base == X86_REG_RIP ||
-// 				op->mem.index == X86_REG_IP ||
-// 				op->mem.index == X86_REG_RIP ||
-// 				result->is_jump) {
-// 			result->has_ip_relative_opr = true;
-// 			assert(!result->is_indirect_jump);
-//
-// 			if (result->is_jump)
-// 				result->is_rel_jump = true;
-//
-// 			assert(op->mem.disp <= INT32_MAX);
-// 			assert(op->mem.disp >= INT32_MIN);
-//
-// 			result->rip_disp = (int32_t)op->mem.disp;
-// 			result->rip_ref_addr = rip + result->rip_disp;
-// 		}
-// 	} else if (op->type == X86_OP_IMM) {
-// 		if (result->is_jump) {
-// 			assert(!result->is_indirect_jump);
-// 			result->has_ip_relative_opr = true;
-// 			result->is_rel_jump = true;
-// 			result->rip_ref_addr = (void *)op->imm;
-// 
-// 			result->rip_disp =
-// 			    (int32_t)((unsigned char *)op->imm - rip);
-// 		}
-// 	}
-// }
-
-/*
  * intercept_disasm_next_instruction - Examines a single instruction
  * in a text section. This is only a wrapper around capstone specific code,
  * collecting data that can be used later to make decisions about patching.
@@ -211,18 +145,7 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 	struct intercept_disasm_result result = {.address = code, 0, };
 	const unsigned char *start = code;
 	size_t size = (size_t)(context->end - code + 1);
-	uint64_t address = (uint64_t)code;
-
-// 	if (size >= sizeof(endbr64) &&
-// 	    memcmp(code, endbr64, sizeof(endbr64)) == 0) {
-// 		result.is_set = true;
-// 		result.is_endbr = true;
-// 		result.length = 4;
-// #ifndef NDEBUG
-// 		result.mnemonic = "endbr64";
-// #endif
-// 		return result;
-// 	}
+	uint64_t address = (uint64_t)code
 
 	if (!cs_disasm_iter(context->handle, &start, &size,
 	    &address, context->insn)) {
@@ -234,11 +157,6 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 	assert(result.length != 0);
 
 	result.is_syscall = (context->insn->id == RISCV_INS_ECALL);
-	// result.is_call = (context->insn->id == RISCV_INS_JAL ||
-	// 									context->insn->id == RISCV_INS_JALR);
-	// result.is_ret = (context->insn->id == RISCV_INS_JALR); // jalr è usata sia per ret che per le chiamate, per asserire o meno queste variabili servono verifiche diverse
-	// result.is_rel_jump = false;
-	// result.is_indirect_jump = false;
 #ifndef NDEBUG
 	result.mnemonic = context->insn->mnemonic;
 #endif
@@ -259,35 +177,6 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 			break;
 		case RISCV_INS_JALR:
 			result.is_jump = true;
-			// result.is_ret = true;
-			// cs_riscv_op *op;
-			// for (uint8_t op_i = 0; result.is_ret &&
-			// 		op_i < context->insn->detail->riscv.op_count; ++op_i) {
-			// 			op = context->insn->detail->riscv.operands + op_i;
-			// 			switch (op->type) {
-			// 				case RISCV_OP_REG:
-			// 					if (op->reg != RISCV_REG_ZERO || op->reg != RISCV_REG_RA) {
-			// 						result.is_ret = false;
-			// 					}
-			// 					break;
-			// 				case RISCV_OP_IMM:
-			// 					if (op->imm != 0) {
-			// 						result.is_ret = false;
-			// 					}
-			// 					break;
-			// 				case RISCV_OP_MEM:
-			// 					if (op->mem.base != RISCV_REG_RA || op->mem.disp != 0) {
-			// 						result.is_ret = false;
-			// 					}
-			// 					break;
-			// 				default:
-			// 					result.is_ret = false;
-			// 					break;
-			// 			}
-			// 		}
-			// 		if (!result.is_ret) {
-			// 			result.is_jump = true;
-			// 		}
 			break;
 		default:
 			result.is_jump = false;
@@ -305,48 +194,11 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 						result.uses_ra = op->mem.base == RISCV_REG_RA;
 						break;
 					default:
-						//result.is_ret = false;
 						break;
 				}
 			}
 			break;
 	}
-
-
-	/*
-	 * Loop over all operands of the instruction currently being decoded.
-	 * These operands are decoded by capstone, and described in the
-	 * context->insn->detail->x86.operands array.
-	 *
-	 * This operand checking serves multiple purposes:
-	 * The destination of any jumping instruction is found here,
-	 * The instructions using RIP relative addressing are found by this
-	 *  loop, e.g.: mov %rax, 0x36eb55d(%rip)
-	 *
-	 * Any instruction relying on the value of the RIP register can not
-	 * be relocated ( including relative jumps, which naturally also
-	 * rely on the RIP register ).
-	 */
-	// for (uint8_t op_i = 0; // needed? PC isn't usable as operand in RISC-V, so you know if instruction it's PC-relative from the instruction itself
-	//     op_i < context->insn->detail->x86.op_count; ++op_i)
-	// 	check_op(&result, context->insn->detail->x86.operands + op_i,
-	// 	    code);
-
-	// result.is_lea_rip = (context->insn->id == X86_INS_LEA && // no LEA instruction equivalent in RISC-V machine language
-	// 		result.has_ip_relative_opr);
-	//
-	// if (result.is_lea_rip) {
-	// 	/*
-	// 	 * Extract the four bits from the encoding, which
-	// 	 * specify the destination register.
-	// 	 */
-	//
-	// 	/* one bit from the REX prefix */
-	// 	result.arg_register_bits = ((code[0] & 4) << 1);
-	//
-	// 	/* three bits from the ModRM byte */
-	// 	result.arg_register_bits |= ((code[2] >> 3) & 7);
-	// }
 
 	result.is_set = true;
 
