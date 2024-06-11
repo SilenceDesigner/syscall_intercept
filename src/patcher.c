@@ -118,7 +118,7 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
 	instructions[21] = 0x01010113; // addi sp, sp, 16
 	instructions[22] = 0x00028067; // jalr zero, t0, 0
-	create_load_uint64t_into_t0(instructions + 4,(uint64_t)value); // writes 5 instructions starting from instructions[4]
+	create_load_uint64t_into_t0(instructions + 4,(uint64_t)to); // writes 5 instructions starting from instructions[4]
 	return instructions + 23;
 }
 
@@ -450,7 +450,7 @@ init_patcher(void)
 static unsigned char *
 create_ret_from_template(unsigned char *code)
 {
-	*((uint32_t)code) = 0x00008067; // jalr zero, ra, 0
+	*((uint32_t *)code) = 0x00008067; // jalr zero, ra, 0
 	return code + 4;
 }
 
