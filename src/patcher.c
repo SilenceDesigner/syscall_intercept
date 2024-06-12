@@ -176,41 +176,6 @@ check_trampoline_usage(const struct intercept_desc *desc)
 }
 
 /*
- * is_nop_in_range - checks if NOP is sufficiently close to address, to be
- * reachable by a jmp having a 8 bit displacement.
- */
-static bool
-is_nop_in_range(unsigned char *address, const struct range *nop)
-{
-	/*
-	 * Planning to put a 5 byte jump starting at the third byte
-	 * of the nop instruction. The syscall should jump to this
-	 * trampoline jump.
-	 */
-	unsigned char *dst = nop->address + 2;
-	/*
-	 * Planning to put a two byte jump in the place of the syscall
-	 * instruction, that is going to jump relative to the value of
-	 * RIP during execution, which points to the next instruction,
-	 * at address + 2.
-	 */
-	unsigned char *src = address + 2;
-
-	/*
-	 * How far can this short jump instruction jump, considering
-	 * the one byte singed displacement?
-	 */
-	unsigned char *reach_min = src - 128;
-	unsigned char *reach_max = src + 127;
-
-	/*
-	 * Can a two byte jump reach the proposed destination?
-	 * I.e.: is dst in the [reach_min, reach_max] range?
-	 */
-	return reach_min <= dst && dst <= reach_max;
-}
-
-/*
  * is_copiable_before_syscall
  * checks if an instruction found before a syscall instruction
  * can be copied (and thus overwritten).
@@ -264,20 +229,17 @@ check_surrounding_instructions(struct intercept_desc *desc,
 				struct patch_desc *patch)
 {
 	patch->uses_prev_ins = (is_copiable_before_syscall(patch->preceding_ins) &&
-	    !is_overwritable_nop(&patch->preceding_ins) &&
 	    !has_jump(desc, patch->syscall_addr));
 
 	if (patch->uses_prev_ins) {
 		patch->uses_prev_ins_2 = (patch->uses_prev_ins &&
 		    is_copiable_before_syscall(patch->preceding_ins_2) &&
-		    !is_overwritable_nop(&patch->preceding_ins_2) &&
 		    !has_jump(desc, patch->syscall_addr - patch->preceding_ins.length));
 	} else {
 		patch->uses_prev_ins_2 = false;
 	}
 
 	patch->uses_next_ins = (is_copiable_after_syscall(patch->following_ins) &&
-	    !is_overwritable_nop(&patch->following_ins) &&
 	    !has_jump(desc, patch->syscall_addr + ECALL_INS_SIZE));
 }
 
@@ -360,7 +322,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 
 				/*
 				 * Address of the syscall instruction
-				 * plus 2 bytes
+				 * plus 4 bytes
 				 * plus the length of the following instruction
 				 *
 				 * adds up to:
@@ -572,7 +534,7 @@ create_j(unsigned char *from, void *to)
 	 * just after the call, and the to address.
 	 */
 	ptrdiff_t delta = ((unsigned char *)to) - from;
-	uint32_t *instructions = (uint32_t)from;
+	uint32_t *instructions = (uint32_t *)from;
 	uint32_t nop = 0x00000013; // nop instruction
 	debug_dump("%p: svc -> b %ld\t# %p\n", from, delta, to);
 
