@@ -90,7 +90,7 @@
 enum { TRAMPOLINE_SIZE = 23 * 4 };
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
-static unsigned char *create_absolute_jump(unsigned char *from, void *to);
+static void create_load_uint64t_into_t0(uint8_t *code, uint64_t value);
 
 /*
  * create_absolute_jump(from, to)
@@ -99,7 +99,7 @@ static unsigned char *create_absolute_jump(unsigned char *from, void *to);
 static unsigned char *
 create_absolute_jump(unsigned char *from, void *to)
 {
-	uint32_t *instructions = (uint32_t)from;
+	uint32_t *instructions = (uint32_t *)from;
 	instructions[0] = 0xff010113; // addi sp, sp, -16
 	instructions[1] = 0x00613023; // sd t1, 0(sp)
 	instructions[2] = 0x00713423; // sd t2, 8(sp)
