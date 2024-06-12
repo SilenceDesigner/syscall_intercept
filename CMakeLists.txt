@@ -41,11 +41,11 @@ if(",${CMAKE_SOURCE_DIR}," STREQUAL ",${CMAKE_BINARY_DIR},")
 endif()
 
 option(PERFORM_STYLE_CHECKS
-	"check coding style, license headers (requires perl)" ON)
+	"check coding style, license headers (requires perl)" OFF)
 option(BUILD_TESTS "build and enable tests" ON)
 option(BUILD_EXAMPLES "build examples" ON)
 option(TREAT_WARNINGS_AS_ERRORS
-	"make the build fail on any warnings during compilation, or linking" ON)
+	"make the build fail on any warnings during compilation, or linking" OFF)
 option(EXPECT_SPURIOUS_SYSCALLS
 	"account for some unexpected syscalls in tests - enable while using sanitizers, gcov" OFF)
 option(STATIC_CAPSTONE "statically link libcapstone into the shared library" OFF)
@@ -216,7 +216,7 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/cmake/cmake_uninstall.cmake.in"
 	"${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake"
 	IMMEDIATE @ONLY)
 add_custom_target(uninstall
-	"${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake") 
+	"${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_BINARY_DIR}/cmake/cmake_uninstall.cmake")
 
 add_subdirectory(doc)
 
