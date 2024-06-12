@@ -145,7 +145,7 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 	struct intercept_disasm_result result = {.address = code, 0, };
 	const unsigned char *start = code;
 	size_t size = (size_t)(context->end - code + 1);
-	uint64_t address = (uint64_t)code
+	uint64_t address = (uint64_t)code;
 
 	if (!cs_disasm_iter(context->handle, &start, &size,
 	    &address, context->insn)) {

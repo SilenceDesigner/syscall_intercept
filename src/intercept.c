@@ -646,7 +646,7 @@ intercept_routine(struct context *context)
 		    desc.args[5],
 		    &result);
 
-	if (desc.nr == SYS_vfork || desc.nr == SYS_rt_sigreturn) {
+	if (desc.nr == SYS_rt_sigreturn) {
 		/* can't handle these syscalls the normal way */
 		return (struct wrapper_ret){.a[0] = context->a[7], .a[1] = 0 };
 	}
