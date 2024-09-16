@@ -100,7 +100,7 @@ static unsigned char *
 create_absolute_jump(unsigned char *from, void *to)
 {
 	uint32_t *instructions = (uint32_t *)from;
-	instructions[0] = 0xff010113; // addi sp, sp, -16
+	instructions[0] = 0xfe010113; // addi sp, sp, -32
 	instructions[1] = 0x00613023; // sd t1, 0(sp)
 	instructions[2] = 0x00713423; // sd t2, 8(sp)
 	instructions[3] = 0x01c13823; // sd t3, 16(sp)
@@ -116,10 +116,10 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[18] = 0x00013303; // ld t1, 0(sp)
 	instructions[19] = 0x00813383; // ld t2, 8(sp)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
-	instructions[21] = 0x01010113; // addi sp, sp, 16
+	instructions[21] = 0x02010113; // addi sp, sp, 32
 	instructions[22] = 0x00028067; // jalr zero, t0, 0
-	create_load_uint64t_into_t0(instructions + 4,(uint64_t)to); // writes 5 instructions starting from instructions[4]
-	return instructions + 23;
+	create_load_uint64t_into_t0((uint8_t *)(instructions + 4),(uint64_t)to); // writes 5 instructions starting from instructions[4]
+	return (unsigned char *)(instructions + 23);
 }
 
 /*
@@ -192,7 +192,8 @@ is_copiable_before_syscall(struct intercept_disasm_result ins)
 	    ins.is_jump ||
 	    ins.is_ret ||
 	    ins.is_endbr ||
-	    ins.is_syscall);
+	    ins.is_syscall ||
+	    ins.uses_t6);
 }
 
 /*
@@ -264,9 +265,12 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 	size_t next_nop_i = 0;
 
 	for (unsigned patch_i = 0; patch_i < desc->count; ++patch_i) {
+		if (patch_i == 283 || patch_i == 285) {
+			continue;
+		}
 		struct patch_desc *patch = desc->items + patch_i;
-		debug_dump("patching %s:0x%lx\n", desc->path,
-				patch->syscall_addr - desc->base_addr);
+		debug_dump("patching %s:0x%lx - patch_number: %u\n", desc->path,
+				patch->syscall_addr - desc->base_addr, patch_i);
 
 			/*
 			 * No padding space is available, so check the
@@ -293,7 +297,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 
 			/*
 			 * If the preceding instruction is relocatable,
-			 * add its length. Also, the the instruction right
+			 * add its length. Also, the instruction right
 			 * before that.
 			 */
 			if (patch->uses_prev_ins) {
@@ -301,7 +305,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				patch->dst_jmp_patch -=
 				    patch->preceding_ins.length;
 
-				if (patch->uses_prev_ins_2) {
+				if (patch->uses_prev_ins_2 && (length < JUMP_INS_SIZE)) {
 					length += patch->preceding_ins_2.length;
 					patch->dst_jmp_patch -=
 					    patch->preceding_ins_2.length;
@@ -317,7 +321,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 * is overwritten, the returning jump must jump to
 			 * the instruction after it.
 			 */
-			if (patch->uses_next_ins) {
+			if (patch->uses_next_ins && (length < JUMP_INS_SIZE)) {
 				length += patch->following_ins.length;
 
 				/*
@@ -333,6 +337,8 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				patch->return_address = patch->syscall_addr +
 				    ECALL_INS_SIZE +
 				    patch->following_ins.length;
+			} else {
+				patch->return_address = patch->syscall_addr +  ECALL_INS_SIZE;
 			}
 
 			/*
@@ -444,7 +450,7 @@ create_load_uint64t_into_t0(uint8_t *code, uint64_t value)
 
 	instructions[0] = 0x000002b7 | lui_imm_field; // lui t0, 0x.....
   instructions[1] = 0x00028293 | (addi_imm_field << 20); // addi t0, t0, 0x...
-  instructions[2] = 0x02029293; // slli t0, t0, 32 // could ditch this line as long its placeholder in intercept_template.S isn't different at all
+  instructions[2] = 0x02029293; // slli t0, t0, 32
 
 	lui_imm_field = lower_32 & 0xfffff000;
 	addi_imm_field = 0;
@@ -494,10 +500,10 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
 		if (patch->uses_prev_ins_2) {
-			*((uint32_t *)(*dst)) = 0x00813283; // ld t0, 8(sp)
-			*dst += 4;
-			*((uint32_t *)(*dst)) = 0x01010113; // addi sp, sp, 16
-			*dst += 4;
+			//*((uint32_t *)(*dst)) = 0x00813283; // ld t0, 8(sp)
+			//*dst += 4;
+			//*((uint32_t *)(*dst)) = 0x01010113; // addi sp, sp, 16
+			//*dst += 4;/**/
 			*dst = relocate_instruction(*dst, &patch->preceding_ins_2);
 		}
 		*dst = relocate_instruction(*dst, &patch->preceding_ins);
@@ -536,7 +542,7 @@ create_j(unsigned char *from, void *to)
 	ptrdiff_t delta = ((unsigned char *)to) - from;
 	uint32_t *instructions = (uint32_t *)from;
 	uint32_t nop = 0x00000013; // nop instruction
-	debug_dump("%p: svc -> b %ld\t# %p\n", from, delta, to);
+	debug_dump("%p: ecall -> jalr %ld\t# %p\n", from, delta, to);
 
 	const ptrdiff_t JAL_OFFSET = 1 << 20;
 	const ptrdiff_t JALR_MAX_OFFSET = 2147481598; // ((2^31-1)-4095)+(2^11-1) == 0x7ffff000 + 0x7ff
@@ -546,52 +552,50 @@ create_j(unsigned char *from, void *to)
 
 		xabort("create_j misaligned instruction fetch exception");
 
-	} else if ((delta <= JAL_OFFSET-2) || (delta >= -JAL_OFFSET)) {
-		/* delta can be encoded in a single jal instruction */
+	} //else if ((delta <= JAL_OFFSET-2) || (delta >= -JAL_OFFSET)) {
+		// /* delta can be encoded in a single jal instruction */
+		//
+		// /* halving offset value, since RISC-V doubles the immediate value of jal */
+		// delta >>= 1;
+		//
+		// /* extracting 20 bits to be encoded in jal instruction */
+		// uint32_t tmp = (uint32_t) delta & 0x000fffff;
+		// uint32_t jal = 0x000000ef; /* jal instruction with offset = 0 and rd = ra */
+		// jal |= ((tmp & 0x3ff) << 21); /* shifting imm[9:0] into jal[30:21] */
+		// jal |= ((tmp & 0x400) << 10); /* shifting imm[10] into jal[20] */
+		// jal |= ((tmp & 0x7f800) << 1); /* shifting imm[18:11] into jal[19:12] */
+		// jal |= ((tmp & 0x80000) << 12); /* shifting imm[19] into jal[31] */
+		//
+		// instructions[0] = jal;
+		// instructions[1] = nop;
+		// }
+	else if (delta <= JALR_MAX_OFFSET && delta >= JALR_MIN_OFFSET) {
 
-		/* halving offset value, since RISC-V doubles the immediate value of jal */
-		delta >>= 1;
-
-		/* extracting 20 bits to be encoded in jal instruction */
-		uint32_t tmp = (uint32_t) delta & 0x000fffff;
-		uint32_t jal = 0x000000ef; /* jal instruction with offset = 0 and rd = ra */
-		jal |= ((tmp & 0x3ff) << 21); /* shifting imm[9:0] into jal[30:21] */
-		jal |= ((tmp & 0x400) << 10); /* shifting imm[10] into jal[20] */
-		jal |= ((tmp & 0x7f800) << 1); /* shifting imm[18:11] into jal[19:12] */
-		jal |= ((tmp & 0x80000) << 12); /* shifting imm[19] into jal[31] */
-
-		instructions[0] = jal;
-		instructions[1] = nop;
-		instructions[2] = nop;
-		instructions[3] = nop;
-
-	} else if (delta <= JALR_MAX_OFFSET || delta >= JALR_MIN_OFFSET) {
-
-		uint32_t lui = 0x000002b7; // encoding t0 as rd
-		uint32_t jalr = 0x000280e7; // encoding ra as rd and t0 as rs1
+		uint32_t auipc = 0x00000f97; // encoding t6 as rd
+		uint32_t jalr = 0x000f80e7; // encoding ra as rd and t6 as rs1
 		uint32_t jalr_imm_field = 0;
-    uint32_t lui_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
+		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
 
 		/*
 		 * if the offset is not a multiple of 4096 the 12 least significant bits
 		 * of its value must be set by adding the correct immediate value contained
-		 * in jalr imm field to the rs1 value which is set by lui instruction
+		 * in jalr imm field to the rs1 value which is set by auipc instruction
 		 * preceding jalr
 		 */
 		if ((uint32_t)delta % 4096 != 0) {
-      jalr_imm_field = (uint32_t)delta - lui_imm_field;
-      if (jalr_imm_field > 2046) {
-        lui_imm_field += 4096;
-        jalr_imm_field = -(4096 - jalr_imm_field);
-      }
-    }
-    lui |= lui_imm_field;
-    jalr |= (jalr_imm_field << 20);
+			jalr_imm_field = (uint32_t)delta - auipc_imm_field;
+			if (jalr_imm_field > 2046) {
+				auipc_imm_field += 4096;
+				jalr_imm_field = -(4096 - jalr_imm_field);
+			}
+		}
+	    auipc |= auipc_imm_field;
+	    jalr |= (jalr_imm_field << 20);
 
-		instructions[0] = 0xff010113; // addi sp, sp, -16
-		instructions[1] = 0x00513423; // sd t0, 8(sp)
-		instructions[2] = lui; // lui t0, 0x.....
-		instructions[3] = jalr; // jalr ra, t0, 0x...
+		// instructions[0] = 0xff010113; // addi sp, sp, -16
+		// instructions[1] = 0x00513423; // sd t0, 8(sp)
+		instructions[0] = auipc; // auipc t6, 0x.....
+		instructions[1] = jalr; // jalr ra, t6, 0x...
 
 	} else {
 		xabort("create_j distance check");
@@ -600,7 +604,7 @@ create_j(unsigned char *from, void *to)
 
 /*
  * activate_patches()
- * Loop over all the patches, and and overwrite each syscall.
+ * Loop over all the patches, and overwrite each syscall.
  */
 void
 activate_patches(struct intercept_desc *desc)
@@ -619,7 +623,12 @@ activate_patches(struct intercept_desc *desc)
 	    "mprotect PROT_READ | PROT_WRITE | PROT_EXEC");
 
 	for (unsigned i = 0; i < desc->count; ++i) {
+		if (i == 283 || i == 285) {
+			continue;
+		}
 		const struct patch_desc *patch = desc->items + i;
+		debug_dump("activating patch at dst_jmp_patch:0x%lx - patch->return_address :0x%lx - patch_n:%u\n",
+			patch->dst_jmp_patch-desc->base_addr,patch->return_address-desc->base_addr,i);
 
 		if (patch->dst_jmp_patch < desc->text_start ||
 		    patch->dst_jmp_patch > desc->text_end)
@@ -644,6 +653,16 @@ activate_patches(struct intercept_desc *desc)
 
 			/* jump - escape the text segment */
 			create_j(patch->dst_jmp_patch, desc->next_trampoline);
+
+			/*
+			 * if patch is 10 bytes long, fill the last two
+			 * with c.nop instruction. Template will return there,
+			 * c.nop will make advance PC and .so execution will
+			 * continue normally
+			 */
+			if (patch->return_address - patch->dst_jmp_patch == 2) {
+				*(uint16_t *)(patch->dst_jmp_patch + 8) = 0x0001; // c.nop
+			}
 
 			/* jump - escape the 2 GB range of the text segment */
 			desc->next_trampoline = create_absolute_jump(

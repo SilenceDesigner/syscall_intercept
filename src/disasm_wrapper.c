@@ -90,7 +90,7 @@ intercept_disasm_init(const unsigned char *begin, const unsigned char *end)
 	 * Initialize the disassembler.
 	 * The handle here must be passed to capstone each time it is used.
 	 */
-	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64, &context->handle) != CS_ERR_OK)
+	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCVC, &context->handle) != CS_ERR_OK)
 		xabort("cs_open");
 
 	/*
@@ -169,6 +169,10 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 		case RISCV_INS_BLTU:
 		case RISCV_INS_BNE:
 		case RISCV_INS_JAL:
+		case RISCV_INS_C_J:
+		case RISCV_INS_C_JAL:
+		case RISCV_INS_C_BEQZ:
+		case RISCV_INS_C_BNEZ:
 			result.has_ip_relative_opr = true;
 			result.is_jump = true;
 			break;
@@ -176,6 +180,7 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 			result.has_ip_relative_opr = true;
 			break;
 		case RISCV_INS_JALR:
+		case RISCV_INS_C_JALR:
 			result.is_jump = true;
 			break;
 		default:
@@ -192,6 +197,21 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 						break;
 					case RISCV_OP_MEM:
 						result.uses_ra = op->mem.base == RISCV_REG_RA;
+						break;
+					default:
+						break;
+				}
+			}
+			result.uses_t6 = false;
+			for (uint8_t op_i = 0; !result.uses_t6 &&
+					 op_i < context->insn->detail->riscv.op_count; ++op_i) {
+				op = context->insn->detail->riscv.operands + op_i;
+				switch (op->type) {
+					case RISCV_OP_REG:
+						result.uses_t6 = op->reg == RISCV_REG_T6;
+						break;
+					case RISCV_OP_MEM:
+						result.uses_t6 = op->mem.base == RISCV_REG_T6;
 						break;
 					default:
 						break;

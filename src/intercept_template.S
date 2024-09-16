@@ -59,7 +59,7 @@
   addi sp, sp, -32 # allocate stack for some locals
   sd t6, 0(sp) # original sp on stack
   sd ra, 16(sp) # patch->return_address on stack
-  sd s0, 24(sp) # following conventions by saving s0 on stack since we use it
+  sd s0, 24(sp) # follows conventions by saving s0 on stack since we use it
   bnez t5, intercept_asm_wrapper_patch_desc_addr
   li s0, 0 # s0 as flag: 1 if we are going for post_clone, 0 otherwise
  intercept_asm_wrapper_patch_desc_addr:
@@ -67,11 +67,12 @@
 
   # the 5 following instructions are placeholders for the correct ones which are
   # overwritten in machine language by create_load_uint64t_into_t0()
-  lui t0, 0x00000
-  addi t0, t0, 0x000
-  slli t0, t0, 32
-  lui t3, 0x00000
-  addi t3, t3, 0x000
+  .space 20, 0
+  #lui t0, 0x00000
+  #addi t0, t0, 0x000
+  #slli t0, t0, 32
+  #lui t3, 0x00000
+  #addi t3, t3, 0x000
 
   # the 9 following instructions load the 64-bit address in t0
   lui t1, 0x7ffff
@@ -90,11 +91,12 @@
 
   # the 5 following instructions are placeholders for the correct ones which are
   # written in machine language in create_load_uint64t_into_t0() in patcher.c
-  lui t0, 0x00000
-  ori t0, t0, 0x000
-  slli t0, t0, 32
-  lui t3, 0x00000
-  ori t3, t3, 0x000
+  .space 20, 0
+  #lui t0, 0x00000
+  #ori t0, t0, 0x000
+  #slli t0, t0, 32
+  #lui t3, 0x00000
+  #ori t3, t3, 0x000
 
   # the 9 following instructions load the 64-bit address in t0
   lui t1, 0x7ffff
@@ -114,9 +116,9 @@
   # The intercept_wrapper function did restore all registers to their
   # original state, except for a0, sp and t6.
   #
-  # If t6 is zero, rax contains a syscall number, and that syscall
+  # If t6 is zero, a0 contains a syscall number, and that syscall
   # is executed here.
-  # If t6 is 1, rax contains the return value of the hooked syscall.
+  # If t6 is 1, a0 contains the return value of the hooked syscall.
   # If t6 is 2, a clone syscall is executed here.
 
   beqz t6, l2
