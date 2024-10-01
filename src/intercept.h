@@ -111,6 +111,22 @@ struct patch_desc {
 
 	bool uses_nop_trampoline;
 
+	/*
+	 * Flag marking if the patch has just 6 relocatable bytes. If true
+	 * an auipc+c.jalr sequence is needed to perform a jump to the trampoline
+	 */
+	bool needs_compressed_ins;
+
+	/*
+	 * Flag marking if the patch is 10 bytes long. If true, two 32 bits
+	 * instructions and one compressed 16 bit instruction has been selected
+	 * for patching, but since 8 bytes are enough a 2 byte padding is needed.
+	 * It will be provided by a c.nop instruction. If compressed instructions
+	 * are not supported this will never happen since the patch can just be 8
+	 * bytes long (or 4, in case of failure)
+	 */
+	bool padding_is_needed;
+
 	struct range nop_trampoline;
 };
 
@@ -210,7 +226,7 @@ void activate_patches(struct intercept_desc *desc);
  * actually the jump summing its immediate value to the just wrote register to
  * calculate desination of the jump
  */
-#define JUMP_INS_SIZE 16
+#define JUMP_INS_SIZE 8
 // #define CALL_OPCODE 0xe8
 // #define JMP_OPCODE 0xe9
 // #define SHORT_JMP_OPCODE 0xeb

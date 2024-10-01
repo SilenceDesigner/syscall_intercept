@@ -79,6 +79,9 @@
 #include <string.h>
 
 #include <stdio.h>
+#include <sys/auxv.h>
+
+#define COMPAT_HWCAP_ISA_C (1 << ('C' - 'A'))
 
 /* The size of a trampoline jump, 64-bit address loading process into a register
  * (which requires 14 instructions to encode directly in machine code) + JALR.
@@ -91,6 +94,7 @@ enum { TRAMPOLINE_SIZE = 23 * 4 };
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
 static void create_load_uint64t_into_t0(uint8_t *code, uint64_t value);
+static void create_load_uint64t_into_t6(uint8_t *code, uint64_t value);
 
 /*
  * create_absolute_jump(from, to)
@@ -112,13 +116,13 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[14] = 0x00131313; // slli t1, t1, 1
 	instructions[15] = 0x00136313; // ori t1, t1, 1
 	instructions[16] = 0x006e7e33; // and t3, t3, t1
-	instructions[17] = 0x01c2e2b3; // or t0, t0, t3
+	instructions[17] = 0x01cfefb3; // or t6, t6, t3
 	instructions[18] = 0x00013303; // ld t1, 0(sp)
 	instructions[19] = 0x00813383; // ld t2, 8(sp)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
 	instructions[21] = 0x02010113; // addi sp, sp, 32
-	instructions[22] = 0x00028067; // jalr zero, t0, 0
-	create_load_uint64t_into_t0((uint8_t *)(instructions + 4),(uint64_t)to); // writes 5 instructions starting from instructions[4]
+	instructions[22] = 0x000f8067; // jalr zero, t6, 0
+	create_load_uint64t_into_t6((uint8_t *)(instructions + 4),(uint64_t)to); // writes 5 instructions starting from instructions[4]
 	return (unsigned char *)(instructions + 23);
 }
 
@@ -215,7 +219,7 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 	    ins.is_jump ||
 	    ins.is_endbr ||
 	    ins.is_syscall ||
-			ins.uses_ra);
+	    ins.uses_ra);
 }
 
 
@@ -257,17 +261,14 @@ check_surrounding_instructions(struct intercept_desc *desc,
  *
  * This is all based on the information collected by the routine
  * find_syscalls, which does the disassembling, finding jump destinations,
- * finding padding bytes, etc..
+ * finding padding bytes, etc...
  */
 void
 create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 {
-	size_t next_nop_i = 0;
-
+	short min_treshold = JUMP_INS_SIZE;
+	bool c_isa_supported = getauxval(AT_HWCAP) & COMPAT_HWCAP_ISA_C;
 	for (unsigned patch_i = 0; patch_i < desc->count; ++patch_i) {
-		if (patch_i == 283 || patch_i == 285) {
-			continue;
-		}
 		struct patch_desc *patch = desc->items + patch_i;
 		debug_dump("patching %s:0x%lx - patch_number: %u\n", desc->path,
 				patch->syscall_addr - desc->base_addr, patch_i);
@@ -293,6 +294,8 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 */
 			unsigned length = ECALL_INS_SIZE;
 
+			patch->needs_compressed_ins = false;
+			patch->padding_is_needed = false;
 			patch->dst_jmp_patch = patch->syscall_addr;
 
 			/*
@@ -341,13 +344,31 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				patch->return_address = patch->syscall_addr +  ECALL_INS_SIZE;
 			}
 
+			if (length > JUMP_INS_SIZE) {
+				patch->padding_is_needed = true;
+				patch->return_address -= (length - JUMP_INS_SIZE);
+			}
+
 			/*
-			 * If the length is at least 16, then a jump instruction
-			 * with a 32 bit displacement can fit.
+			 * Check if compressed instructions module is supported by the CPU.
+			 * If yes, 6 bytes are enough to place an auipc+c.jalr sequence.
+			 * If the length of the patch is exactly 6 bytes, then we assert
+			 * the flag marking the need of said sequence.
 			 *
-			 * Otherwise give up
+			 * If length is less than minimum needed bytes (value depending on
+			 * ISA C module being supported or not), give up.
+			 *
+			 * TO DO: creating an environment variable marking if all ECALLs
+			 * must be patchable for success or if we could just skip the
+			 * unpatchable ones.
 			 */
-			if (length < JUMP_INS_SIZE) {
+			if (c_isa_supported) {
+				if (length == 6) {
+					patch->needs_compressed_ins = true;
+				}
+				min_treshold = 6;
+			}
+			if (length < min_treshold) {
 				char buffer[0x1000];
 
 				int l = snprintf(buffer, sizeof(buffer),
@@ -356,8 +377,13 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 					patch->syscall_offset);
 
 				intercept_log(buffer, (size_t)l);
+				debug_dump("unintercepted syscall at: %s 0x%lx\n",
+					desc->path,
+					patch->syscall_offset);
+#ifdef ABORT_ON_FAILURE
 				xabort("not enough space for patching"
 				    " around syscal");
+#endif
 			}
 
 		mark_jump(desc, patch->return_address);
@@ -464,7 +490,42 @@ create_load_uint64t_into_t0(uint8_t *code, uint64_t value)
 
 	instructions[3] = 0x00000e37 | lui_imm_field; // lui t3, 0x.....
   instructions[4] = 0x000e0e13 | (addi_imm_field << 20); // addi t3, t3, 0x...
+}
 
+static void
+create_load_uint64t_into_t6(uint8_t *code, uint64_t value)
+{
+
+	uint32_t *instructions = (uint32_t *)code;
+	uint32_t upper_32 = (value & 0xffffffff00000000) >> 32;
+	uint32_t lower_32 = (uint32_t)value;
+
+	uint32_t lui_imm_field = upper_32 & 0xfffff000;
+	uint32_t addi_imm_field = 0;
+	if (upper_32 % 4096 != 0) {
+		addi_imm_field = upper_32 - lui_imm_field;
+		if (addi_imm_field > 2047) {
+			lui_imm_field += 4096;
+			addi_imm_field = -(4096 - addi_imm_field);
+		}
+	}
+
+	instructions[0] = 0x00000fb7 | lui_imm_field; // lui t6, 0x.....
+	instructions[1] = 0x000f8f93 | (addi_imm_field << 20); // addi t6, t6, 0x...
+	instructions[2] = 0x020f9f93; // slli t6, t6, 32
+
+	lui_imm_field = lower_32 & 0xfffff000;
+	addi_imm_field = 0;
+	if (lower_32 % 4096 != 0) {
+		addi_imm_field = lower_32 - lui_imm_field;
+		if (addi_imm_field > 2047) {
+			lui_imm_field += 4096;
+			addi_imm_field = -(4096 - addi_imm_field);
+		}
+	}
+
+	instructions[3] = 0x00000e37 | lui_imm_field; // lui t3, 0x.....
+	instructions[4] = 0x000e0e13 | (addi_imm_field << 20); // addi t3, t3, 0x...
 }
 
 /*
@@ -500,10 +561,6 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
 		if (patch->uses_prev_ins_2) {
-			//*((uint32_t *)(*dst)) = 0x00813283; // ld t0, 8(sp)
-			//*dst += 4;
-			//*((uint32_t *)(*dst)) = 0x01010113; // addi sp, sp, 16
-			//*dst += 4;/**/
 			*dst = relocate_instruction(*dst, &patch->preceding_ins_2);
 		}
 		*dst = relocate_instruction(*dst, &patch->preceding_ins);
@@ -552,27 +609,11 @@ create_j(unsigned char *from, void *to)
 
 		xabort("create_j misaligned instruction fetch exception");
 
-	} //else if ((delta <= JAL_OFFSET-2) || (delta >= -JAL_OFFSET)) {
-		// /* delta can be encoded in a single jal instruction */
-		//
-		// /* halving offset value, since RISC-V doubles the immediate value of jal */
-		// delta >>= 1;
-		//
-		// /* extracting 20 bits to be encoded in jal instruction */
-		// uint32_t tmp = (uint32_t) delta & 0x000fffff;
-		// uint32_t jal = 0x000000ef; /* jal instruction with offset = 0 and rd = ra */
-		// jal |= ((tmp & 0x3ff) << 21); /* shifting imm[9:0] into jal[30:21] */
-		// jal |= ((tmp & 0x400) << 10); /* shifting imm[10] into jal[20] */
-		// jal |= ((tmp & 0x7f800) << 1); /* shifting imm[18:11] into jal[19:12] */
-		// jal |= ((tmp & 0x80000) << 12); /* shifting imm[19] into jal[31] */
-		//
-		// instructions[0] = jal;
-		// instructions[1] = nop;
-		// }
-	else if (delta <= JALR_MAX_OFFSET && delta >= JALR_MIN_OFFSET) {
+	}
+	if (delta <= JALR_MAX_OFFSET && delta >= JALR_MIN_OFFSET) {
 
-		uint32_t auipc = 0x00000f97; // encoding t6 as rd
-		uint32_t jalr = 0x000f80e7; // encoding ra as rd and t6 as rs1
+		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
+		uint32_t jalr = 0x000f80e7; // jalr ra, t6, 0x...
 		uint32_t jalr_imm_field = 0;
 		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
 
@@ -591,15 +632,33 @@ create_j(unsigned char *from, void *to)
 		}
 	    auipc |= auipc_imm_field;
 	    jalr |= (jalr_imm_field << 20);
-
-		// instructions[0] = 0xff010113; // addi sp, sp, -16
-		// instructions[1] = 0x00513423; // sd t0, 8(sp)
 		instructions[0] = auipc; // auipc t6, 0x.....
 		instructions[1] = jalr; // jalr ra, t6, 0x...
-
 	} else {
 		xabort("create_j distance check");
 	}
+}
+
+void
+create_c_j(unsigned char *from, void *to) {
+	ptrdiff_t delta = ((unsigned char *)to) - from;
+	debug_dump("%p: ecall -> c.jalr %ld\t# %p\n", from, delta, to);
+	const ptrdiff_t AUIPC_MAX_OFFSET = 2147479552;
+	const ptrdiff_t AUIPC_MIN_OFFSET = -2147483648;
+	if ((delta & 0xfff) != 0) {
+		xabort("create_c_j misaligned instruction fetch exception");
+	}
+	if (delta >= AUIPC_MIN_OFFSET && delta <= AUIPC_MAX_OFFSET) {
+		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
+		uint16_t c_jalr = 0x9f82; // c.jalr t6
+		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
+		auipc |= auipc_imm_field;
+		*(uint32_t *)from = auipc;
+		*(uint16_t *)(from + 4) = c_jalr;
+	} else {
+		xabort("create_c_j distance check");
+	}
+
 }
 
 /*
@@ -623,12 +682,10 @@ activate_patches(struct intercept_desc *desc)
 	    "mprotect PROT_READ | PROT_WRITE | PROT_EXEC");
 
 	for (unsigned i = 0; i < desc->count; ++i) {
-		if (i == 283 || i == 285) {
-			continue;
-		}
 		const struct patch_desc *patch = desc->items + i;
-		debug_dump("activating patch at dst_jmp_patch:0x%lx - patch->return_address :0x%lx - patch_n:%u\n",
-			patch->dst_jmp_patch-desc->base_addr,patch->return_address-desc->base_addr,i);
+		debug_dump("\nactivating patch at dst_jmp_patch: 0x%lx - patch->return_address: 0x%lx - patch_n:%u\n"
+			"patch_absolute_return_address: %p\n",
+			patch->dst_jmp_patch-desc->base_addr,patch->return_address-desc->base_addr,i,patch->return_address);
 
 		if (patch->dst_jmp_patch < desc->text_start ||
 		    patch->dst_jmp_patch > desc->text_end)
@@ -650,23 +707,31 @@ activate_patches(struct intercept_desc *desc)
 			 * jump to the asm_wrapper.
 			 */
 			check_trampoline_usage(desc);
+			if (!patch->needs_compressed_ins) {
 
-			/* jump - escape the text segment */
-			create_j(patch->dst_jmp_patch, desc->next_trampoline);
+				/* jump - escape the text segment */
+				create_j(patch->dst_jmp_patch, desc->next_trampoline);
 
-			/*
-			 * if patch is 10 bytes long, fill the last two
-			 * with c.nop instruction. Template will return there,
-			 * c.nop will make advance PC and .so execution will
-			 * continue normally
-			 */
-			if (patch->return_address - patch->dst_jmp_patch == 2) {
-				*(uint16_t *)(patch->dst_jmp_patch + 8) = 0x0001; // c.nop
+				/*
+				 * if patch is 10 bytes long, fill the last two
+				 * with c.nop instruction. Template will return there,
+				 * c.nop will make advance PC and .so execution will
+				 * continue normally
+				 */
+				if (patch->padding_is_needed) {
+					*(uint16_t *)patch->return_address = 0x0001;
+				}
+
+				/* jump - escape the 2 GB range of the text segment */
+				desc->next_trampoline = create_absolute_jump(
+					desc->next_trampoline, patch->asm_wrapper);
+			} else {
+				const int rem = (desc->next_trampoline - patch->dst_jmp_patch) % 4096;
+				if (rem) {
+					desc->next_trampoline += 4096 - rem;
+				}
+				create_c_j(patch->dst_jmp_patch, desc->next_trampoline);
 			}
-
-			/* jump - escape the 2 GB range of the text segment */
-			desc->next_trampoline = create_absolute_jump(
-				desc->next_trampoline, patch->asm_wrapper);
 		} else {
 			create_j(patch->dst_jmp_patch, patch->asm_wrapper);
 		}
