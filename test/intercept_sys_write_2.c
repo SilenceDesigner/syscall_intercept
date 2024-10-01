@@ -50,7 +50,4 @@ init(void)
 int main() {
     char buf[128] = "original_syscall\n";
     write(1, buf, strlen(buf));
-    printf("correctly returned to libc from asm_template\n");
-    printf("\n");
-    return 0;
 }
