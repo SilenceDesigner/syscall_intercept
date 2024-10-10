@@ -716,7 +716,7 @@ activate_patches(struct intercept_desc *desc)
 				 * if patch is 10 bytes long, fill the last two
 				 * with c.nop instruction. Template will return there,
 				 * c.nop will make advance PC and .so execution will
-				 * continue normally
+				 * normally take back control
 				 */
 				if (patch->padding_is_needed) {
 					*(uint16_t *)patch->return_address = 0x0001;
@@ -731,6 +731,9 @@ activate_patches(struct intercept_desc *desc)
 					desc->next_trampoline += 4096 - rem;
 				}
 				create_c_j(patch->dst_jmp_patch, desc->next_trampoline);
+
+				desc->next_trampoline = create_absolute_jump(
+					desc->next_trampoline, patch->asm_wrapper);
 			}
 		} else {
 			create_j(patch->dst_jmp_patch, patch->asm_wrapper);
