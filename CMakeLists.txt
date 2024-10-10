@@ -42,8 +42,8 @@ endif()
 
 option(PERFORM_STYLE_CHECKS
 	"check coding style, license headers (requires perl)" OFF)
-option(BUILD_TESTS "build and enable tests" ON)
-option(BUILD_EXAMPLES "build examples" ON)
+option(BUILD_TESTS "build and enable tests" OFF)
+option(BUILD_EXAMPLES "build examples" OFF)
 option(TREAT_WARNINGS_AS_ERRORS
 	"make the build fail on any warnings during compilation, or linking" OFF)
 option(EXPECT_SPURIOUS_SYSCALLS
@@ -85,7 +85,7 @@ set(SOURCES_ASM
 
 
 include_directories(include "/usr/local/include/capstone")
-link_directories("/usr/local/lib/capstone")
+link_directories("/usr/local/lib")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
