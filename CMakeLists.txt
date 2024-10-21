@@ -84,8 +84,9 @@ set(SOURCES_ASM
 	src/intercept_wrapper.S)
 
 
-include_directories(include "/usr/local/include/capstone")
-link_directories("/usr/local/lib")
+include_directories(include "~/capstone-install/include/capstone")
+link_directories("~/capstone-install/lib64")
+
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
