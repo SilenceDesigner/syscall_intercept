@@ -33,18 +33,18 @@
 # A simple test with a single syscall instruction.
 #
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
-#include "mock_trampoline_table.S"
+.include "mock_trampoline_table.S"
 
 .text
 
 text_start:
 		addi a7, zero, 1
 		addi a7, a7, zero
+		c.mv t2, t1
+		c.mv t0, t1
 		ecall
-		addi zero, zero, zero
+		c.mv t3, a0
 text_end:

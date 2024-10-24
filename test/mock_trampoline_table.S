@@ -45,35 +45,62 @@
 # trampoline table has the same format, each mock entry has the same size as
 # as such a trampoline jump would have. Since these patched syscalls are
 # never executed in these low level tests, these jumps don't need to be
-# real functioning jumps, thus their destination is ".space 8, 0" in all
+# real functioning jumps, thus their destination is ".space 92, 0" in all
 # cases -- the only thing that matters, is to have these at predictable
 # addresses.
 
-.globl trampoline_table;
-.globl trampoline_table_end;
+.global trampoline_table;
+.global trampoline_table_end;
 
 .data
 
 trampoline_table:
 dst0:
-	addi sp, sp, -16
-	sd t1, 0(sp)
-	sd t2, 8(sp)
-	sd t3, 16(sp)
-	.space 20, 0
-	lui t1, 0x7ffff
-	ori t2, zero, 0x7ff
-	slli t2, t2, 1
-	ori t2, t2, 1
-	or t1, t1, t2
-	slli t1, t1, 1
-	ori t1, t1, 1
-	and t3, t3, t1
-	or t0, t0, t3
-	ld t1, 0(sp)
-	ld t2, 8(sp)
-	ld t3, 16(sp)
-	addi sp, sp, 16
-	jalr zero, t0, 0
-
+		.space 92, 0
+dst1:
+		.space 92, 0
+dst2:
+		.space 92, 0
+dst3:
+		.space 92, 0
+dst4:
+		.space 92, 0
+dst5:
+		.space 92, 0
+dst6:
+		.space 92, 0
+dst7:
+		.space 92, 0
+dst8:
+		.space 92, 0
+dst9:
+		.space 92, 0
+dst10:
+		.space 92, 0
+dst11:
+		.space 92, 0
+dst12:
+		.space 92, 0
+dst13:
+		.space 92, 0
+dst14:
+		.space 92, 0
+dst15:
+		.space 92, 0
+dst16:
+		.space 92, 0
+dst17:
+		.space 92, 0
+dst18:
+		.space 92, 0
+dst19:
+		.space 92, 0
+dst20:
+		.space 92, 0
+dst21:
+		.space 92, 0
+dst22:
+		.space 92, 0
+dst23:
+		.space 92, 0
 trampoline_table_end:
