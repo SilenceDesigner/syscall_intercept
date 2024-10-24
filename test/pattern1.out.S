@@ -31,26 +31,16 @@
 
 # see pattern1.in.S
 
-.intel_syntax noprefix
-
 .global text_start;
 .global text_end;
 
-#include "mock_trampoline_table.S"
+.include "mock_trampoline_table.S"
 
 .text
 
 text_start:
-		jal dst0
-		addi zero, zero, 0 # nop
-		addi zero, zero, 0 # nop
-		addi zero, zero, 0 # nop
-
-		#otherwise
-
-		# addi sp, sp, -16
-		# sd t0, 8(sp)
-		# lui t0, 0x.....
-		# jalr ra, t0, 0x...
-
+        addi a7, zero, 1
+        addi a7, a7, zero
+        jal dst0
+        c.mv t3, a0
 text_end:
