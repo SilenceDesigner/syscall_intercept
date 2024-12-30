@@ -7,3 +7,4 @@ tags
 build/
 .idea/
 cmake-build-debug/
+test/*.so

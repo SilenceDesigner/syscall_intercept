@@ -24,11 +24,12 @@ static __attribute__((constructor)) void init(void)
     intercept_hook_point = hook;
 }
 
-int main() {
-    int fd = openat(AT_FDCWD,"non_existing_original_file.txt", O_RDONLY);
-    if (fd >= 0) {
-        write(1, "Success: File opened\n", 21);
-    } else {
-        write(1, "Failure: File not opened\n", 25);
-    }
-}
+//int main() {
+//    int fd = openat(AT_FDCWD,"non_existing_original_file.txt", O_RDONLY);
+//    if (fd >= 0) {
+//        write(1, "Success: File opened\n", 21);
+//    } else {
+//        write(1, "Specified file doesn't exist - Test is ok if previous line is:\n"
+//                 "\"Proof of openat interception\"\n", 25);
+//    }
+//}
