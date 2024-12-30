@@ -85,7 +85,7 @@
 
 /* The size of a trampoline jump, 64-bit address loading process into a register
  * (which requires 14 instructions to encode directly in machine code) + JALR.
- * These are preceeded and succeeded by storing and restoring of tmp registers
+ * These are preceded and succeeded by storing and restoring of tmp registers
  * used for the creation of the absolute jump. We can't clobber them since two
  * instructions that were placed before the original ecall still must be
  * executed.
@@ -219,6 +219,7 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 	    ins.is_jump ||
 	    ins.is_endbr ||
 	    ins.is_syscall ||
+	    ins.uses_t6 ||
 	    ins.uses_ra);
 }
 
@@ -312,6 +313,12 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 					length += patch->preceding_ins_2.length;
 					patch->dst_jmp_patch -=
 					    patch->preceding_ins_2.length;
+				} else {
+					/*
+					 * If it could be used but is not necessary we need
+					 * to set the flag to false so that it's not relocated
+					 */
+					patch->uses_prev_ins_2 = false;
 				}
 			}
 
@@ -341,12 +348,17 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				    ECALL_INS_SIZE +
 				    patch->following_ins.length;
 			} else {
+				/*
+				 * If it could be used but is not necessary we need
+				 * to set the flag to false so that it's not relocated
+				 */
+				patch->uses_next_ins = false;
 				patch->return_address = patch->syscall_addr +  ECALL_INS_SIZE;
 			}
 
 			if (length > JUMP_INS_SIZE) {
 				patch->padding_is_needed = true;
-				patch->return_address -= (length - JUMP_INS_SIZE);
+				// patch->return_address -= (length - JUMP_INS_SIZE);
 			}
 
 			/*
@@ -380,10 +392,8 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				debug_dump("unintercepted syscall at: %s 0x%lx\n",
 					desc->path,
 					patch->syscall_offset);
-#ifdef ABORT_ON_FAILURE
 				xabort("not enough space for patching"
 				    " around syscal");
-#endif
 			}
 
 		mark_jump(desc, patch->return_address);
@@ -556,7 +566,6 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 {
 	/* Create a new copy of the template */
 	patch->asm_wrapper = *dst;
-	uint32_t *instructions = (uint32_t *)(*dst);
 
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
@@ -576,15 +585,15 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	if (patch->uses_next_ins)
 		*dst = relocate_instruction(*dst, &patch->following_ins);
 
-	// *dst = create_absolute_jump(*dst, patch->return_address); // since ra is updated with patch->return_address by JALR when jumping to trampoline, writing RET is enough
-	*dst = create_ret_from_template(*dst);
+	*dst = create_absolute_jump(*dst, patch->return_address);
+	// *dst = create_ret_from_template(*dst);
 }
 
 /*
  * create_j(from, to)
  * Create a 4 byte JAL instruction jumping to address to, by overwriting
  * code starting at address from, if trampoline displacement is within + or -
- * 1 MiB. Otherwise create a 2 instructions sequence (LUI + JALR) which allows
+ * 1 MiB. Otherwise, create a 2 instructions sequence (LUI + JALR) which allows
  * to reach trampoline if its displacement is within -2 GiB or JALR_MAX_OFFSET,
  * which is (+2 GiB - 2050 Bytes).
  */
@@ -598,10 +607,8 @@ create_j(unsigned char *from, void *to)
 	 */
 	ptrdiff_t delta = ((unsigned char *)to) - from;
 	uint32_t *instructions = (uint32_t *)from;
-	uint32_t nop = 0x00000013; // nop instruction
 	debug_dump("%p: ecall -> jalr %ld\t# %p\n", from, delta, to);
 
-	const ptrdiff_t JAL_OFFSET = 1 << 20;
 	const ptrdiff_t JALR_MAX_OFFSET = 2147481598; // ((2^31-1)-4095)+(2^11-1) == 0x7ffff000 + 0x7ff
 	const ptrdiff_t JALR_MIN_OFFSET = -2147483648; // (-2^31) == -0x80000000
 
@@ -613,7 +620,7 @@ create_j(unsigned char *from, void *to)
 	if (delta <= JALR_MAX_OFFSET && delta >= JALR_MIN_OFFSET) {
 
 		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
-		uint32_t jalr = 0x000f80e7; // jalr ra, t6, 0x...
+		uint32_t jalr = 0x000f8067; // jalr zero, t6, 0x...
 		uint32_t jalr_imm_field = 0;
 		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
 
@@ -633,7 +640,7 @@ create_j(unsigned char *from, void *to)
 	    auipc |= auipc_imm_field;
 	    jalr |= (jalr_imm_field << 20);
 		instructions[0] = auipc; // auipc t6, 0x.....
-		instructions[1] = jalr; // jalr ra, t6, 0x...
+		instructions[1] = jalr; // jalr zero, t6, 0x...
 	} else {
 		xabort("create_j distance check");
 	}
@@ -650,11 +657,11 @@ create_c_j(unsigned char *from, void *to) {
 	}
 	if (delta >= AUIPC_MIN_OFFSET && delta <= AUIPC_MAX_OFFSET) {
 		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
-		uint16_t c_jalr = 0x9f82; // c.jalr t6
+		uint16_t c_jr = 0x8f82; // c.jr t6
 		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
 		auipc |= auipc_imm_field;
 		*(uint32_t *)from = auipc;
-		*(uint16_t *)(from + 4) = c_jalr;
+		*(uint16_t *)(from + 4) = c_jr;
 	} else {
 		xabort("create_c_j distance check");
 	}
@@ -719,7 +726,7 @@ activate_patches(struct intercept_desc *desc)
 				 * normally take back control
 				 */
 				if (patch->padding_is_needed) {
-					*(uint16_t *)patch->return_address = 0x0001;
+					*(uint16_t *)patch->return_address = 0x0001; // c.nop
 				}
 
 				/* jump - escape the 2 GB range of the text segment */
