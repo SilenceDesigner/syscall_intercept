@@ -25,9 +25,12 @@ static int hook(long syscall_number,
 
         if (len > sizeof(interc)) {
             *result = 0;
-            while (*src != '\0')
+            while (*src != '\0') {
                 *buf++ = *src++;
                 *result += 1;
+            }
+            *buf = '\0';
+            *result += 1;
         }
         return 0;
     }
