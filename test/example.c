@@ -9,7 +9,7 @@ hook(long syscall_number,
             long arg4, long arg5,
             long *result)
 {
-    if (syscall_number == SYS_getdents) {
+    if (syscall_number == SYS_getdents64) {
         /*
          * Prevent the application from
          * using the getdents syscall. From
