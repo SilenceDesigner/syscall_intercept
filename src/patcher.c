@@ -719,15 +719,15 @@ activate_patches(struct intercept_desc *desc)
 				/* jump - escape the text segment */
 				create_j(patch->dst_jmp_patch, desc->next_trampoline);
 
-				/*
-				 * if patch is 10 bytes long, fill the last two
-				 * with c.nop instruction. Template will return there,
-				 * c.nop will make advance PC and .so execution will
-				 * normally take back control
-				 */
-				if (patch->padding_is_needed) {
-					*(uint16_t *)patch->return_address = 0x0001; // c.nop
-				}
+				// /*
+				//  * if patch is 10 bytes long, fill the last two
+				//  * with c.nop instruction. Template will return there,
+				//  * c.nop will make advance PC and .so execution will
+				//  * normally take back control
+				//  */
+				// if (patch->padding_is_needed) {
+				// 	*(uint16_t *)patch->return_address = 0x0001; // c.nop
+				// }
 
 				/* jump - escape the 2 GB range of the text segment */
 				desc->next_trampoline = create_absolute_jump(
