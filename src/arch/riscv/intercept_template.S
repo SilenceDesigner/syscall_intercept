@@ -56,10 +56,14 @@ l0:
 l3:
     ld t6, 0(sp) # we cloned, so save actual original sp
 l4:
-    addi sp, sp, -32 # allocate stack for some locals
+    addi sp, sp, -64 # allocate stack for some locals
     sd t6, 0(sp) # original sp on stack
     sd ra, 16(sp) # patch->return_address on stack
     sd s0, 24(sp) # follows conventions by saving s0 on stack since we use it
+    sd t0, 32(sp)
+    sd t1, 40(sp)
+    sd t2, 48(sp)
+    sd t3, 56(sp)
     bnez t5, intercept_asm_wrapper_patch_desc_addr
     li s0, 0 # s0 as flag: 1 if we are going for post_clone, 0 otherwise
 intercept_asm_wrapper_patch_desc_addr:
@@ -134,24 +138,28 @@ intercept_asm_wrapper_wrapper_level1_addr:
     li t0, 2
     beq t6, t0, l1
 
-    li a7, 94 /* exit_group if t6 contains an invalid value, namely different from */
-    ecall 	  /* 0, 1 or 2 */
+    li a7, 94 /* exit_group if t6 contains an invalid value, */
+    ecall 	  /* namely different from 0, 1 or 2 */
 l1:
     mv a7, a0
     ecall
     li t5, 1 /* choose intercept_routine_post_clone */
-    li s0, 1 /* flag to signal we cloned, restoring sp will require adding 64 */
+    li s0, 1 /* flag to signal we cloned, restoring sp will require adding 128 */
     j l0
 l2:
     mv a7, a0
     ecall
 restore_sp:
     beqz s0, l5
-    addi sp, sp, 32
+    addi sp, sp, 64
 l5:
     ld ra, 16(sp)
     ld s0, 24(sp)
-    addi sp, sp, 32
+    ld t0, 32(sp)
+    ld t1, 40(sp)
+    ld t2, 48(sp)
+    ld t3, 56(sp)
+    addi sp, sp, 64
 
 intercept_asm_wrapper_tmpl_end:
     /*
@@ -161,5 +169,5 @@ intercept_asm_wrapper_tmpl_end:
 
     /*
      * following_ins # !can't use ra as operand! need to check after disassembly
-     * jalr zero, ra, 0
+     * create_absolute_jump(*dst, patch->return_address)
      */
