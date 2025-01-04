@@ -353,6 +353,8 @@ find_jumps_in_section_rela(struct intercept_desc *desc, Elf64_Shdr *section,
 
 	for (size_t i = 0; i < sym_count; ++i) {
 		switch (ELF64_R_TYPE(syms[i].r_info)) {
+			case R_X86_64_RELATIVE:
+			case R_X86_64_RELATIVE64:
 			case R_RISCV_RELATIVE:
 				/* Relocation type: "Adjust by program base" */
 
@@ -405,6 +407,35 @@ add_new_patch(struct intercept_desc *desc)
 }
 
 /*
+ * is_overwritable_nop
+ * Check if an instruction just disassembled is a NOP that can be
+ * used for placing an extra jump instruction into it.
+ * See the nop_trampoline usage in the patcher.c source file.
+ * This instruction is usable only if it occupies at least seven bytes.
+ * Two are needed for a short jump, and another 5 bytes for a trampoline
+ * jump with 32 bit displacement.
+ *
+ * As in (where XXXX represents a 32 bit displacement):
+ *                                Before      After
+ *                                _______     _______
+ * address of NOP instruction ->  | NOP |     | JMP | <- jumps to next
+ *                                |     |     | +8  |     instruction
+ *                                |     |     | JMP | <- 5 bytes of payload
+ *                                |     |     |  X  |
+ *                                |     |     |  X  |
+ *                                |     |     |  X  |
+ *                                |     |     |  X  |
+ *                                |     |     |     |
+ * address of next instruction -> -------     -------
+ *
+ */
+bool
+is_overwritable_nop(const struct intercept_disasm_result *ins)
+{
+	return ins->is_nop && ins->length >= 2 + 5;
+}
+
+/*
  * crawl_text
  * Crawl the text section, disassembling it all.
  * This routine collects information about potential addresses to patch.
@@ -449,10 +480,17 @@ crawl_text(struct intercept_desc *desc)
 		result = intercept_disasm_next_instruction(context, code);
 
 		if (result.length == 0) {
-			debug_dump("code pointer:0x%lx\n",code);
 			++code;
 			continue;
 		}
+
+#if defined(__x86_64__) || defined(_M_X64)
+		if (result.has_ip_relative_opr)
+			mark_jump(desc, result.rip_ref_addr);
+
+		if (is_overwritable_nop(&result))
+			mark_nop(desc, code, result.length);
+#endif
 
 		/*
 		 * Generate a new patch description, if:
@@ -667,6 +705,10 @@ find_syscalls(struct intercept_desc *desc)
 	    (uintptr_t)desc->text_start,
 	    (uintptr_t)desc->text_end);
 	allocate_jump_table(desc);
+
+#if defined(__x86_64__) || defined(_M_X64)
+	allocate_nop_table(desc);
+#endif
 
 	for (Elf64_Half i = 0; i < desc->symbol_tables.count; ++i)
 		find_jumps_in_section_syms(desc,

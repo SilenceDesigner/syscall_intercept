@@ -42,10 +42,17 @@
 #include "intercept_util.h"
 #include "disasm_wrapper.h"
 
-#include <assert.h>
-#include <string.h>
-#include <syscall.h>
 #include "capstone_wrapper.h"
+
+#if defined(__x86_64__) || defined(_M_X64)
+	#define CS_ARCH CS_ARCH_X86
+	#define CS_MODE CS_MODE_64
+#elif defined(__riscv)
+	#define CS_ARCH CS_ARCH_RISCV
+	#define CS_MODE CS_MODE_RISCV64 | CS_MODE_RISCVC
+#else
+	#error "Unsupported ISA"
+#endif
 
 struct intercept_disasm_context {
 	csh handle;
@@ -90,7 +97,7 @@ intercept_disasm_init(const unsigned char *begin, const unsigned char *end)
 	 * Initialize the disassembler.
 	 * The handle here must be passed to capstone each time it is used.
 	 */
-	if (cs_open(CS_ARCH_RISCV, CS_MODE_RISCV64 | CS_MODE_RISCVC, &context->handle) != CS_ERR_OK)
+	if (cs_open(CS_ARCH, CS_MODE, &context->handle) != CS_ERR_OK)
 		xabort("cs_open");
 
 	/*
@@ -129,98 +136,4 @@ intercept_disasm_destroy(struct intercept_disasm_context *context)
 	cs_free(context->insn, 1);
 	cs_close(&context->handle);
 	xmunmap(context, sizeof(*context));
-}
-
-/*
- * intercept_disasm_next_instruction - Examines a single instruction
- * in a text section. This is only a wrapper around capstone specific code,
- * collecting data that can be used later to make decisions about patching.
- */
-struct intercept_disasm_result
-intercept_disasm_next_instruction(struct intercept_disasm_context *context,
-					const unsigned char *code)
-{
-	//static const unsigned char endbr64[] = {0xf3, 0x0f, 0x1e, 0xfa}; // no endbr equivalent in RISC-V
-
-	struct intercept_disasm_result result = {.address = code, 0, };
-	const unsigned char *start = code;
-	size_t size = (size_t)(context->end - code + 1);
-	uint64_t address = (uint64_t)code;
-
-	if (!cs_disasm_iter(context->handle, &start, &size,
-	    &address, context->insn)) {
-		return result;
-	}
-
-	result.length = context->insn->size;
-
-	assert(result.length != 0);
-
-	result.is_syscall = (context->insn->id == RISCV_INS_ECALL);
-#ifndef NDEBUG
-	result.mnemonic = context->insn->mnemonic;
-#endif
-
-	switch (context->insn->id) {
-		case RISCV_INS_BEQ: // PC-relative jumps
-		case RISCV_INS_BGE:
-		case RISCV_INS_BGEU:
-		case RISCV_INS_BLT:
-		case RISCV_INS_BLTU:
-		case RISCV_INS_BNE:
-		case RISCV_INS_JAL:
-		case RISCV_INS_C_J:
-		case RISCV_INS_C_JAL:
-		case RISCV_INS_C_BEQZ:
-		case RISCV_INS_C_BNEZ:
-			result.has_ip_relative_opr = true;
-			result.is_jump = true;
-			break;
-		case RISCV_INS_AUIPC:
-			result.has_ip_relative_opr = true;
-			break;
-		case RISCV_INS_JALR:
-		case RISCV_INS_C_JALR:
-			result.is_jump = true;
-			break;
-		default:
-			result.is_jump = false;
-			result.has_ip_relative_opr = false;
-			result.uses_ra = false;
-			cs_riscv_op *op;
-			for (uint8_t op_i = 0; !result.uses_ra &&
-					 op_i < context->insn->detail->riscv.op_count; ++op_i) {
-				op = context->insn->detail->riscv.operands + op_i;
-				switch (op->type) {
-					case RISCV_OP_REG:
-						result.uses_ra = op->reg == RISCV_REG_RA;
-						break;
-					case RISCV_OP_MEM:
-						result.uses_ra = op->mem.base == RISCV_REG_RA;
-						break;
-					default:
-						break;
-				}
-			}
-			result.uses_t6 = false;
-			for (uint8_t op_i = 0; !result.uses_t6 &&
-					 op_i < context->insn->detail->riscv.op_count; ++op_i) {
-				op = context->insn->detail->riscv.operands + op_i;
-				switch (op->type) {
-					case RISCV_OP_REG:
-						result.uses_t6 = op->reg == RISCV_REG_T6;
-						break;
-					case RISCV_OP_MEM:
-						result.uses_t6 = op->mem.base == RISCV_REG_T6;
-						break;
-					default:
-						break;
-				}
-			}
-			break;
-	}
-
-	result.is_set = true;
-
-	return result;
 }
