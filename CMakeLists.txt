@@ -78,11 +78,26 @@ set(SOURCES_C
 	src/magic_syscalls.c
 	src/syscall_formats.c)
 
-set(SOURCES_ASM
-	src/intercept_template.S
-	src/util.S
-	src/intercept_wrapper.S)
+if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
+	set(SOURCES_C "${SOURCES_C}"
+		src/arch/x86_64/disasm_wrapper.c)
 
+	set(SOURCES_ASM
+		src/arch/x86_64/intercept_template.S
+		src/arch/x86_64/intercept_wrapper.S
+		src/arch/x86_64/util.S
+	)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
+	set(SOURCES_C "${SOURCES_C}"
+		src/arch/riscv/disasm_wrapper.c
+	)
+
+	set(SOURCES_ASM
+		src/arch/riscv/intercept_template.S
+		src/arch/riscv/intercept_wrapper.S
+		src/arch/riscv/util.S
+	)
+endif()
 
 include_directories(include "/usr/local/include/capstone")
 link_directories("/usr/local/lib")
