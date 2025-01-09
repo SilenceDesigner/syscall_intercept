@@ -659,7 +659,7 @@ intercept_routine(struct context *context)
 		 * that serves as the stack space of a new child thread.
 		 * If this is zero, the child thread uses the same address
 		 * as stack pointer as the parent does (e.g.: a copy of
-		 * of the memory area after fork).
+		 * the memory area after fork).
 		 *
 		 * The code at clone_wrapper only returns to this routine
 		 * in the parent thread. In the child thread, it calls

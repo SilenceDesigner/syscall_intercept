@@ -48,6 +48,8 @@
  * preceding_ins
  */
 intercept_asm_wrapper_tmpl:
+    addi sp, sp -8
+    sd t5, 0(sp)
     li t5, 0 # choose intercept_routine
 l0:
     bnez t5, l3
@@ -159,7 +161,8 @@ l5:
     ld t1, 40(sp)
     ld t2, 48(sp)
     ld t3, 56(sp)
-    addi sp, sp, 64
+    ld t5, 64(sp) # t5 was saved at what currently can be accessed with 64(sp)
+    addi sp, sp, 72
 
 intercept_asm_wrapper_tmpl_end:
     /*
