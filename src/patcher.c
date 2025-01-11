@@ -219,8 +219,7 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 	    ins.is_jump ||
 	    ins.is_endbr ||
 	    ins.is_syscall ||
-	    ins.uses_t6 ||
-	    ins.uses_ra);
+	    ins.uses_t6);
 }
 
 
@@ -719,15 +718,15 @@ activate_patches(struct intercept_desc *desc)
 				/* jump - escape the text segment */
 				create_j(patch->dst_jmp_patch, desc->next_trampoline);
 
-				// /*
-				//  * if patch is 10 bytes long, fill the last two
-				//  * with c.nop instruction. Template will return there,
-				//  * c.nop will make advance PC and .so execution will
-				//  * normally take back control
-				//  */
-				// if (patch->padding_is_needed) {
-				// 	*(uint16_t *)patch->return_address = 0x0001; // c.nop
-				// }
+				/*
+				 * if patch is 10 bytes long, fill the last two
+				 * with c.ebreak instruction. Template will jump back to the
+				 * return address so c.ebreak will never be executed as long
+				 * as the patching correctly the return jump from template.
+				 */
+				if (patch->padding_is_needed) {
+					*(uint16_t *)(patch->return_address-2) = 0x8002; // c.ebreak
+				}
 
 				/* jump - escape the 2 GB range of the text segment */
 				desc->next_trampoline = create_absolute_jump(
