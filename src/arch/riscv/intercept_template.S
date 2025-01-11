@@ -48,7 +48,7 @@
  * preceding_ins
  */
 intercept_asm_wrapper_tmpl:
-    addi sp, sp -8
+    addi sp, sp, -8
     sd t5, 0(sp)
     li t5, 0 # choose intercept_routine
 l0:
