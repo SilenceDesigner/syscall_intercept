@@ -218,21 +218,45 @@ void mprotect_asm_wrappers(void);
  */
 void activate_patches(struct intercept_desc *desc);
 
-#define ECALL_INS_SIZE 4
-/*
- * 16 bytes are actually needed to write 4 instructions. The 1st one decreases
- * sp value, the 2nd one stores one tmp reg into the stack, the 3rd one uses the
- * saved register to write part of the destination address and the 4th one is
- * actually the jump summing its immediate value to the just wrote register to
- * calculate desination of the jump
- */
-#define JUMP_INS_SIZE 8
-// #define CALL_OPCODE 0xe8
-// #define JMP_OPCODE 0xe9
-// #define SHORT_JMP_OPCODE 0xeb
-// #define PUSH_IMM_OPCODE 0x68
-// #define NOP_OPCODE 0x90
-// #define INT3_OPCODE 0xCC
+#if defined(__x86_64__) || defined(_M_X64)
+	#define SYSCALL_INS_SIZE 2
+	#define JUMP_INS_SIZE 5
+	#define TRAMPOLINE_SIZE 14
+	#define SYSCALL_NR context->rax
+	#define FIRST_ARG_REG context->rdi
+	#define SECOND_ARG_REG context->rsi
+	#define THIRD_ARG_REG context->rdx
+	#define FOURTH_ARG_REG context->r10
+	#define FIFTH_ARG_REG context->r8
+	#define SIXTH_ARG_REG context->r9
+	#define FIRST_RET_REG .rax
+	#define SECOND_RET_REG .rdx
+	#define CALL_OPCODE 0xe8
+	#define JMP_OPCODE 0xe9
+	#define SHORT_JMP_OPCODE 0xeb
+	#define PUSH_IMM_OPCODE 0x68
+	#define NOP_OPCODE 0x90
+	#define INT3_OPCODE 0xCC
+#elif defined(__riscv)
+	#define SYSCALL_INS_SIZE 4
+	/*
+	 * 8 bytes are needed to be able to perform
+	 * a PC-relative jump with a 32-bit offset
+	 */
+	#define JUMP_INS_SIZE 8
+	#define TRAMPOLINE_SIZE 92
+	#define SYSCALL_NR context->a[7]
+	#define FIRST_ARG_REG context->a[0]
+	#define SECOND_ARG_REG context->a[1]
+	#define THIRD_ARG_REG context->a[2]
+	#define FOURTH_ARG_REG context->a[3]
+	#define FIFTH_ARG_REG context->a[4]
+	#define SIXTH_ARG_REG context->a[5]
+	#define FIRST_RET_REG .a[0]
+	#define SECOND_RET_REG .a[1]
+#else
+	#error "Unsupported ISA"
+#endif
 
 bool is_overwritable_nop(const struct intercept_disasm_result *ins);
 

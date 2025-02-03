@@ -68,9 +68,9 @@
  *
  */
 
-#include "intercept.h"
-#include "intercept_util.h"
-#include "intercept_log.h"
+#include "../../intercept.h"
+#include "../../intercept_util.h"
+#include "../../intercept_log.h"
 
 #include <assert.h>
 #include <stdint.h>
@@ -79,51 +79,43 @@
 #include <string.h>
 
 #include <stdio.h>
-#include <sys/auxv.h>
 
-#define COMPAT_HWCAP_ISA_C (1 << ('C' - 'A'))
-
-/* The size of a trampoline jump, 64-bit address loading process into a register
- * (which requires 14 instructions to encode directly in machine code) + JALR.
- * These are preceded and succeeded by storing and restoring of tmp registers
- * used for the creation of the absolute jump. We can't clobber them since two
- * instructions that were placed before the original ecall still must be
- * executed.
- */
-// enum { TRAMPOLINE_SIZE = 23 * 4 };
+/* The size of a trampoline jump, jmp instruction + pointer */
+//enum { TRAMPOLINE_SIZE = 6 + 8 };
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
-static void create_load_uint64t_into_t0(uint8_t *code, uint64_t value);
-static void create_load_uint64t_into_t6(uint8_t *code, uint64_t value);
 
 /*
  * create_absolute_jump(from, to)
+ * Create an indirect jump, with the pointer right next to the instruction.
  *
+ * jmp *0(%rip)
+ *
+ * This uses up 6 bytes for the jump instruction, and another 8 bytes
+ * for the pointer right after the instruction.
  */
 static unsigned char *
 create_absolute_jump(unsigned char *from, void *to)
 {
-	uint32_t *instructions = (uint32_t *)from;
-	instructions[0] = 0xfe010113; // addi sp, sp, -32
-	instructions[1] = 0x00613023; // sd t1, 0(sp)
-	instructions[2] = 0x00713423; // sd t2, 8(sp)
-	instructions[3] = 0x01c13823; // sd t3, 16(sp)
-	instructions[9] = 0x7ffff337; // lui t1, 0x7ffff
-	instructions[10] = 0x7ff06393; // ori t2, zero, 0x7ff
-	instructions[11] = 0x00139393; // slli t2, t2, 1
-	instructions[12] = 0x0013e393; // ori t2, t2, 1
-	instructions[13] = 0x00736333; // or t1, t1, t2
-	instructions[14] = 0x00131313; // slli t1, t1, 1
-	instructions[15] = 0x00136313; // ori t1, t1, 1
-	instructions[16] = 0x006e7e33; // and t3, t3, t1
-	instructions[17] = 0x01cfefb3; // or t6, t6, t3
-	instructions[18] = 0x00013303; // ld t1, 0(sp)
-	instructions[19] = 0x00813383; // ld t2, 8(sp)
-	instructions[20] = 0x01013e03; // ld t3, 16(sp)
-	instructions[21] = 0x02010113; // addi sp, sp, 32
-	instructions[22] = 0x000f8067; // jalr zero, t6, 0
-	create_load_uint64t_into_t6((uint8_t *)(instructions + 4),(uint64_t)to); // writes 5 instructions starting from instructions[4]
-	return (unsigned char *)(instructions + 23);
+	*from++ = 0xff; /* opcode of RIP based indirect jump */
+	*from++ = 0x25; /* opcode of RIP based indirect jump */
+	*from++ = 0; /* 32 bit zero offset */
+	*from++ = 0; /* this means zero relative to the value */
+	*from++ = 0; /* of RIP, which during the execution of the jump */
+	*from++ = 0; /* points to right after the jump instruction */
+
+	unsigned char *d = (unsigned char *)&to;
+
+	*from++ = d[0]; /* so, this is where (RIP + 0) points to, */
+	*from++ = d[1]; /* jump reads the destination address */
+	*from++ = d[2]; /* from here */
+	*from++ = d[3];
+	*from++ = d[4];
+	*from++ = d[5];
+	*from++ = d[6];
+	*from++ = d[7];
+
+	return from;
 }
 
 /*
@@ -180,6 +172,90 @@ check_trampoline_usage(const struct intercept_desc *desc)
 }
 
 /*
+ * is_nop_in_range - checks if NOP is sufficiently close to address, to be
+ * reachable by a jmp having a 8 bit displacement.
+ */
+static bool
+is_nop_in_range(unsigned char *address, const struct range *nop)
+{
+	/*
+	 * Planning to put a 5 byte jump starting at the third byte
+	 * of the nop instruction. The syscall should jump to this
+	 * trampoline jump.
+	 */
+	unsigned char *dst = nop->address + 2;
+	/*
+	 * Planning to put a two byte jump in the place of the syscall
+	 * instruction, that is going to jump relative to the value of
+	 * RIP during execution, which points to the next instruction,
+	 * at address + 2.
+	 */
+	unsigned char *src = address + 2;
+
+	/*
+	 * How far can this short jump instruction jump, considering
+	 * the one byte singed displacement?
+	 */
+	unsigned char *reach_min = src - 128;
+	unsigned char *reach_max = src + 127;
+
+	/*
+	 * Can a two byte jump reach the proposed destination?
+	 * I.e.: is dst in the [reach_min, reach_max] range?
+	 */
+	return reach_min <= dst && dst <= reach_max;
+}
+
+/*
+ * assign_nop_trampoline
+ * Looks for a NOP instruction close to a syscall instruction to be patched.
+ * The struct patch_desc argument specifies where the particular syscall
+ * instruction resides, and the struct intercept_desc argument of course
+ * already contains information about NOPs, collected by the find_syscalls
+ * routine.
+ *
+ * This routine essentially initializes the uses_nop_trampoline and
+ * the nop_trampoline fields of a struct patch_desc.
+ */
+static void
+assign_nop_trampoline(struct intercept_desc *desc,
+		struct patch_desc *patch,
+		size_t *next_nop_i)
+{
+	struct range *nop = desc->nop_table + *next_nop_i;
+
+	if (*next_nop_i >= desc->nop_count) {
+		patch->uses_nop_trampoline = false;
+		return; /* no more nops available */
+	}
+
+	/*
+	 * Consider a nop instruction, to use as trampoline, but only
+	 * if a two byte jump in the place of the syscall can jump
+	 * to the proposed trampoline. Check if the nop is:
+	 *  1) at an address too low
+	 *  2) close enough for a two byte jump
+	 *  3) at an address too high
+	 */
+
+	if (is_nop_in_range(patch->syscall_addr, nop)) {
+		patch->uses_nop_trampoline = true;
+		patch->nop_trampoline = *nop;
+		++(*next_nop_i);
+		return; /* found a nop in range to use as trampoline */
+	}
+
+	if (nop->address > patch->syscall_addr) {
+		patch->uses_nop_trampoline = false;
+		return; /* nop is too far ahead */
+	}
+
+	/* nop is too far behind, try the next nop */
+	++(*next_nop_i);
+	assign_nop_trampoline(desc, patch, next_nop_i);
+}
+
+/*
  * is_copiable_before_syscall
  * checks if an instruction found before a syscall instruction
  * can be copied (and thus overwritten).
@@ -196,8 +272,7 @@ is_copiable_before_syscall(struct intercept_disasm_result ins)
 	    ins.is_jump ||
 	    ins.is_ret ||
 	    ins.is_endbr ||
-	    ins.is_syscall ||
-	    ins.uses_t6);
+	    ins.is_syscall);
 }
 
 /*
@@ -218,33 +293,39 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
 	    ins.is_endbr ||
-	    ins.is_syscall ||
-	    ins.uses_t6);
+	    ins.is_syscall);
 }
 
 
 /*
  * check_surrounding_instructions
  * Sets up the following members in a patch_desc, based on
- * instruction being relocatable or not:
+ * instruction being relocateable or not:
  * uses_prev_ins ; uses_prev_ins_2 ; uses_next_ins
  */
 static void
 check_surrounding_instructions(struct intercept_desc *desc,
 				struct patch_desc *patch)
 {
-	patch->uses_prev_ins = (is_copiable_before_syscall(patch->preceding_ins) &&
+	patch->uses_prev_ins = patch->preceding_ins.is_lea_rip ||
+	    (is_copiable_before_syscall(patch->preceding_ins) &&
+	    !is_overwritable_nop(&patch->preceding_ins) &&
 	    !has_jump(desc, patch->syscall_addr));
 
 	if (patch->uses_prev_ins) {
-		patch->uses_prev_ins_2 = (patch->uses_prev_ins &&
+		patch->uses_prev_ins_2 = patch->preceding_ins_2.is_lea_rip ||
+		    (patch->uses_prev_ins &&
 		    is_copiable_before_syscall(patch->preceding_ins_2) &&
-		    !has_jump(desc, patch->syscall_addr - patch->preceding_ins.length));
+		    !is_overwritable_nop(&patch->preceding_ins_2) &&
+		    !has_jump(desc, patch->syscall_addr
+			- patch->preceding_ins.length));
 	} else {
 		patch->uses_prev_ins_2 = false;
 	}
 
-	patch->uses_next_ins = (is_copiable_after_syscall(patch->following_ins) &&
+	patch->uses_next_ins = patch->following_ins.is_lea_rip ||
+	    (is_copiable_after_syscall(patch->following_ins) &&
+	    !is_overwritable_nop(&patch->following_ins) &&
 	    !has_jump(desc, patch->syscall_addr + SYSCALL_INS_SIZE));
 }
 
@@ -261,18 +342,49 @@ check_surrounding_instructions(struct intercept_desc *desc,
  *
  * This is all based on the information collected by the routine
  * find_syscalls, which does the disassembling, finding jump destinations,
- * finding padding bytes, etc...
+ * finding padding bytes, etc..
  */
 void
 create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 {
-	short min_treshold = JUMP_INS_SIZE;
-	bool c_isa_supported = getauxval(AT_HWCAP) & COMPAT_HWCAP_ISA_C;
+	size_t next_nop_i = 0;
+
 	for (unsigned patch_i = 0; patch_i < desc->count; ++patch_i) {
 		struct patch_desc *patch = desc->items + patch_i;
-		debug_dump("patching %s:0x%lx - patch_number: %u\n", desc->path,
-				patch->syscall_addr - desc->base_addr, patch_i);
+		debug_dump("patching %s:0x%lx\n", desc->path,
+				patch->syscall_addr - desc->base_addr);
 
+		assign_nop_trampoline(desc, patch, &next_nop_i);
+
+		if (patch->uses_nop_trampoline) {
+			/*
+			 * The preferred option it to use a 5 byte relative
+			 * jump in a padding space between symbols in libc.
+			 * If such padding space is found, a 2 byte short
+			 * jump is enough for jumping to it, thus no
+			 * instructions other than the syscall
+			 * itself need to be overwritten.
+			 */
+			patch->uses_prev_ins = false;
+			patch->uses_prev_ins_2 = false;
+			patch->uses_next_ins = false;
+			patch->dst_jmp_patch =
+			    patch->nop_trampoline.address + 2;
+			/*
+			 * The first two bytes of the nop are used for
+			 * something else, see the explanation
+			 * at is_overwritable_nop in intercept_desc.c
+			 */
+
+			/*
+			 * Return to libc:
+			 * just jump to instruction right after the place
+			 * where the syscall instruction was originally.
+			 */
+			patch->return_address =
+			    patch->syscall_addr + SYSCALL_INS_SIZE;
+
+		} else {
 			/*
 			 * No padding space is available, so check the
 			 * instructions surrounding the syscall instruction.
@@ -288,19 +400,17 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 * Count the number of overwritable bytes
 			 * in the variable length.
 			 * Sum up the bytes that can be overwritten.
-			 * The 4 bytes of the ecall instruction can
+			 * The 2 bytes of the syscall instruction can
 			 * be overwritten definitely, so length starts
-			 * as SYSCALL_INS_SIZE ( 4 bytes ).
+			 * as SYSCALL_INS_SIZE ( 2 bytes ).
 			 */
 			unsigned length = SYSCALL_INS_SIZE;
 
-			patch->needs_compressed_ins = false;
-			patch->padding_is_needed = false;
 			patch->dst_jmp_patch = patch->syscall_addr;
 
 			/*
 			 * If the preceding instruction is relocatable,
-			 * add its length. Also, the instruction right
+			 * add its length. Also, the the instruction right
 			 * before that.
 			 */
 			if (patch->uses_prev_ins) {
@@ -308,16 +418,10 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				patch->dst_jmp_patch -=
 				    patch->preceding_ins.length;
 
-				if (patch->uses_prev_ins_2 && (length < JUMP_INS_SIZE)) {
+				if (patch->uses_prev_ins_2) {
 					length += patch->preceding_ins_2.length;
 					patch->dst_jmp_patch -=
 					    patch->preceding_ins_2.length;
-				} else {
-					/*
-					 * If it could be used but is not necessary we need
-					 * to set the flag to false so that it's not relocated
-					 */
-					patch->uses_prev_ins_2 = false;
 				}
 			}
 
@@ -330,12 +434,12 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 * is overwritten, the returning jump must jump to
 			 * the instruction after it.
 			 */
-			if (patch->uses_next_ins && (length < JUMP_INS_SIZE)) {
+			if (patch->uses_next_ins) {
 				length += patch->following_ins.length;
 
 				/*
 				 * Address of the syscall instruction
-				 * plus 4 bytes
+				 * plus 2 bytes
 				 * plus the length of the following instruction
 				 *
 				 * adds up to:
@@ -348,38 +452,26 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				    patch->following_ins.length;
 			} else {
 				/*
-				 * If it could be used but is not necessary we need
-				 * to set the flag to false so that it's not relocated
+				 * Address of the syscall instruction
+				 * plus 2 bytes
+				 *
+				 * adds up to:
+				 *
+				 * the address of the first instruction after
+				 * the syscall ( just like in the case of
+				 * using padding bytes ).
 				 */
-				patch->uses_next_ins = false;
-				patch->return_address = patch->syscall_addr +  SYSCALL_INS_SIZE;
-			}
-
-			if (length > JUMP_INS_SIZE) {
-				patch->padding_is_needed = true;
-				// patch->return_address -= (length - JUMP_INS_SIZE);
+				patch->return_address =
+					patch->syscall_addr + SYSCALL_INS_SIZE;
 			}
 
 			/*
-			 * Check if compressed instructions module is supported by the CPU.
-			 * If yes, 6 bytes are enough to place an auipc+c.jalr sequence.
-			 * If the length of the patch is exactly 6 bytes, then we assert
-			 * the flag marking the need of said sequence.
+			 * If the length is at least 5, then a jump instruction
+			 * with a 32 bit displacement can fit.
 			 *
-			 * If length is less than minimum needed bytes (value depending on
-			 * ISA C module being supported or not), give up.
-			 *
-			 * TO DO: creating an environment variable marking if all ECALLs
-			 * must be patchable for success or if we could just skip the
-			 * unpatchable ones.
+			 * Otherwise give up
 			 */
-			if (c_isa_supported) {
-				if (length == 6) {
-					patch->needs_compressed_ins = true;
-				}
-				min_treshold = 6;
-			}
-			if (length < min_treshold) {
+			if (length < JUMP_INS_SIZE) {
 				char buffer[0x1000];
 
 				int l = snprintf(buffer, sizeof(buffer),
@@ -388,12 +480,10 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 					patch->syscall_offset);
 
 				intercept_log(buffer, (size_t)l);
-				debug_dump("unintercepted syscall at: %s 0x%lx\n",
-					desc->path,
-					patch->syscall_offset);
 				xabort("not enough space for patching"
 				    " around syscal");
 			}
+		}
 
 		mark_jump(desc, patch->return_address);
 
@@ -414,7 +504,7 @@ size_t asm_wrapper_tmpl_size;
 static ptrdiff_t o_patch_desc_addr;
 static ptrdiff_t o_wrapper_level1_addr;
 
-bool intercept_routine_must_save_ymm = false; // temporarily hardcoded
+bool intercept_routine_must_save_ymm;
 
 /*
  * init_patcher
@@ -439,102 +529,56 @@ init_patcher(void)
 	o_patch_desc_addr = &intercept_asm_wrapper_patch_desc_addr - begin;
 	o_wrapper_level1_addr =
 		&intercept_asm_wrapper_wrapper_level1_addr - begin;
+
+	/*
+	 * has_ymm_registers -- checks if AVX instructions are supported,
+	 * thus YMM registers can be used on this CPU.
+	 *
+	 * this function is implemented in util.s
+	 *
+	 * XXX check for ZMM registers, and save/restore them!
+	 */
+	extern bool has_ymm_registers(void);
+
+	intercept_routine_must_save_ymm = has_ymm_registers();
 }
 
-
 /*
- * create_ret_from_template
- * Write a RET instruction (encoded as JALR) to return to patch->return_address.
- * This is possible as long patch->return_address is saved to ra in the first
- * place when jumping to trampoline when intercepting the system call. This is
- * not explicitly written at the end of intercept_template.S since the fourth
- * overwritten instruction has to be relocated before RET.
+ * create_movabs
+ * Generates a movabs instruction, that assigns a 64 bit constant to
+ * the 64 general purpose register.
+ * the reg_bits value must contain the X86 encoding of the register.
+ * Returns a pointer to the char right after the generated instruction.
  */
 static unsigned char *
-create_ret_from_template(unsigned char *code)
+create_movabs(unsigned char *code, uint64_t value, unsigned char reg_bits)
 {
-	*((uint32_t *)code) = 0x00008067; // jalr zero, ra, 0
-	return code + 4;
+	assert(reg_bits < 16);
+
+	unsigned char *bytes = (unsigned char *)&value;
+
+	*code++ = 0x48 | (reg_bits >> 3); /* REX prefix */
+	*code++ = 0xb8 | (reg_bits & 7); /* opcode */
+	*code++ = bytes[0];
+	*code++ = bytes[1];
+	*code++ = bytes[2];
+	*code++ = bytes[3];
+	*code++ = bytes[4];
+	*code++ = bytes[5];
+	*code++ = bytes[6];
+	*code++ = bytes[7];
+
+	return code;
 }
 
 /*
- * create_load_uint64t_into_t0
- * Generates the first 5 instructions (LUI,ADDI,SLLI,LUI,ADDI) of a convoluted
- * 14 instructions sequence that assign a 64 bit constant to a register.
- * See intercept_template.S for the following 9 at
- * intercept_asm_wrapper_patch_desc_addr (an equal sequence is placed at
- * intercept_asm_wrapper_wrapper_level1_addr as well).
+ * create_movabs_r11
+ * Generates a movabs instruction moving a value into the R11 register.
  */
-static void
-create_load_uint64t_into_t0(uint8_t *code, uint64_t value)
+static unsigned char *
+create_movabs_r11(unsigned char *code, uint64_t value)
 {
-
-	uint32_t *instructions = (uint32_t *)code;
-	uint32_t upper_32 = (value & 0xffffffff00000000) >> 32;
-	uint32_t lower_32 = (uint32_t)value;
-
-	uint32_t lui_imm_field = upper_32 & 0xfffff000;
-  uint32_t addi_imm_field = 0;
-  if (upper_32 % 4096 != 0) {
-    addi_imm_field = upper_32 - lui_imm_field;
-    if (addi_imm_field > 2047) {
-      lui_imm_field += 4096;
-      addi_imm_field = -(4096 - addi_imm_field);
-    }
-  }
-
-	instructions[0] = 0x000002b7 | lui_imm_field; // lui t0, 0x.....
-  instructions[1] = 0x00028293 | (addi_imm_field << 20); // addi t0, t0, 0x...
-  instructions[2] = 0x02029293; // slli t0, t0, 32
-
-	lui_imm_field = lower_32 & 0xfffff000;
-	addi_imm_field = 0;
-	if (lower_32 % 4096 != 0) {
-		addi_imm_field = lower_32 - lui_imm_field;
-		if (addi_imm_field > 2047) {
-			lui_imm_field += 4096;
-			addi_imm_field = -(4096 - addi_imm_field);
-		}
-	}
-
-	instructions[3] = 0x00000e37 | lui_imm_field; // lui t3, 0x.....
-  instructions[4] = 0x000e0e13 | (addi_imm_field << 20); // addi t3, t3, 0x...
-}
-
-static void
-create_load_uint64t_into_t6(uint8_t *code, uint64_t value)
-{
-
-	uint32_t *instructions = (uint32_t *)code;
-	uint32_t upper_32 = (value & 0xffffffff00000000) >> 32;
-	uint32_t lower_32 = (uint32_t)value;
-
-	uint32_t lui_imm_field = upper_32 & 0xfffff000;
-	uint32_t addi_imm_field = 0;
-	if (upper_32 % 4096 != 0) {
-		addi_imm_field = upper_32 - lui_imm_field;
-		if (addi_imm_field > 2047) {
-			lui_imm_field += 4096;
-			addi_imm_field = -(4096 - addi_imm_field);
-		}
-	}
-
-	instructions[0] = 0x00000fb7 | lui_imm_field; // lui t6, 0x.....
-	instructions[1] = 0x000f8f93 | (addi_imm_field << 20); // addi t6, t6, 0x...
-	instructions[2] = 0x020f9f93; // slli t6, t6, 32
-
-	lui_imm_field = lower_32 & 0xfffff000;
-	addi_imm_field = 0;
-	if (lower_32 % 4096 != 0) {
-		addi_imm_field = lower_32 - lui_imm_field;
-		if (addi_imm_field > 2047) {
-			lui_imm_field += 4096;
-			addi_imm_field = -(4096 - addi_imm_field);
-		}
-	}
-
-	instructions[3] = 0x00000e37 | lui_imm_field; // lui t3, 0x.....
-	instructions[4] = 0x000e0e13 | (addi_imm_field << 20); // addi t3, t3, 0x...
+	return create_movabs(code, value, 11);
 }
 
 /*
@@ -547,8 +591,19 @@ static unsigned char *
 relocate_instruction(unsigned char *dst,
 			const struct intercept_disasm_result *ins)
 {
+	if (ins->is_lea_rip) {
+		/*
+		 * Substitue a "lea $offset(%rip), %reg" instruction
+		 * by a movabs instruction, to achieve the same effect.
+		 * The result of the lea calculation is already calculated
+		 * in the rip_ref_addr variable.
+		 */
+		return create_movabs(dst, (uint64_t)ins->rip_ref_addr,
+				ins->arg_register_bits);
+	} else {
 		memcpy(dst, ins->address, ins->length);
 		return dst + ins->length;
+	}
 }
 
 /*
@@ -568,15 +623,15 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 
 	/* Copy the previous instruction(s) */
 	if (patch->uses_prev_ins) {
-		if (patch->uses_prev_ins_2) {
-			*dst = relocate_instruction(*dst, &patch->preceding_ins_2);
-		}
+		if (patch->uses_prev_ins_2)
+			*dst = relocate_instruction(*dst,
+					&patch->preceding_ins_2);
 		*dst = relocate_instruction(*dst, &patch->preceding_ins);
 	}
 
 	memcpy(*dst, intercept_asm_wrapper_tmpl, asm_wrapper_tmpl_size);
-	create_load_uint64t_into_t0(*dst + o_patch_desc_addr, (uintptr_t)patch); // why the uintptr_t cast? What if the address is not representable on 32 bit?
-	create_load_uint64t_into_t0(*dst + o_wrapper_level1_addr,
+	create_movabs_r11(*dst + o_patch_desc_addr, (uintptr_t)patch);
+	create_movabs_r11(*dst + o_wrapper_level1_addr,
 				(uintptr_t)&intercept_wrapper);
 	*dst += asm_wrapper_tmpl_size;
 
@@ -585,91 +640,38 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 		*dst = relocate_instruction(*dst, &patch->following_ins);
 
 	*dst = create_absolute_jump(*dst, patch->return_address);
-	// *dst = create_ret_from_template(*dst);
 }
 
 /*
- * create_j(from, to)
- * Create a 4 byte JAL instruction jumping to address to, by overwriting
- * code starting at address from, if trampoline displacement is within + or -
- * 1 MiB. Otherwise, create a 2 instructions sequence (LUI + JALR) which allows
- * to reach trampoline if its displacement is within -2 GiB or JALR_MAX_OFFSET,
- * which is (+2 GiB - 2050 Bytes).
+ * create_short_jump
+ * Generates a 2 byte jump instruction. The to address must be reachable
+ * using an 8 bit displacement.
  */
-void
-create_j(unsigned char *from, void *to)
+static void
+create_short_jump(unsigned char *from, unsigned char *to)
 {
-	/*
-	 * The operand is the difference between the
-	 * instruction pointer pointing to the instruction
-	 * just after the call, and the to address.
-	 */
-	ptrdiff_t delta = ((unsigned char *)to) - from;
-	uint32_t *instructions = (uint32_t *)from;
-	debug_dump("%p: ecall -> jalr %ld\t# %p\n", from, delta, to);
+	ptrdiff_t d = to - (from + 2);
 
-	const ptrdiff_t JALR_MAX_OFFSET =  2147481598; // ((2^31-1)-4095)+(2^11-1) = 0x7ffff000 + 0x7ff
-	const ptrdiff_t JALR_MIN_OFFSET = -2147483648; // (-2^31) = -0x80000000
+	if (d < - 128 || d > 127)
+		xabort("create_short_jump distance check");
 
-	if ((delta & 0x1) != 0) {
-
-		xabort("create_j misaligned instruction fetch exception");
-
-	}
-	if (delta <= JALR_MAX_OFFSET && delta >= JALR_MIN_OFFSET) {
-
-		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
-		uint32_t jalr = 0x000f8067; // jalr zero, t6, 0x...
-		uint32_t jalr_imm_field = 0;
-		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
-
-		/*
-		 * if the offset is not a multiple of 4096 the 12 least significant bits
-		 * of its value must be set by adding the correct immediate value contained
-		 * in jalr imm field to the rs1 value which is set by auipc instruction
-		 * preceding jalr
-		 */
-		if ((uint32_t)delta % 4096 != 0) {
-			jalr_imm_field = (uint32_t)delta - auipc_imm_field;
-			if (jalr_imm_field > 2046) {
-				auipc_imm_field += 4096;
-				jalr_imm_field = -(4096 - jalr_imm_field);
-			}
-		}
-	    auipc |= auipc_imm_field;
-	    jalr |= (jalr_imm_field << 20);
-		instructions[0] = auipc; // auipc t6, 0x.....
-		instructions[1] = jalr; // jalr zero, t6, 0x...
-	} else {
-		xabort("create_j distance check");
-	}
+	from[0] = SHORT_JMP_OPCODE;
+	from[1] = (unsigned char)((char)d);
 }
 
-void
-create_c_j(unsigned char *from, void *to) {
-	ptrdiff_t delta = ((unsigned char *)to) - from;
-	debug_dump("%p: ecall -> c.jalr %ld\t# %p\n", from, delta, to);
-	const ptrdiff_t AUIPC_MAX_OFFSET = 2147479552;
-	const ptrdiff_t AUIPC_MIN_OFFSET = -2147483648;
-	if ((delta & 0xfff) != 0) {
-		xabort("create_c_j misaligned instruction fetch exception");
-	}
-	if (delta >= AUIPC_MIN_OFFSET && delta <= AUIPC_MAX_OFFSET) {
-		uint32_t auipc = 0x00000f97; // auipc t6, 0x.....
-		uint16_t c_jr = 0x8f82; // c.jr t6
-		uint32_t auipc_imm_field = (uint32_t)delta & 0xfffff000; // offset[31:12]
-		auipc |= auipc_imm_field;
-		*(uint32_t *)from = auipc;
-		*(uint16_t *)(from + 4) = c_jr;
-	} else {
-		xabort("create_c_j distance check");
-	}
-
+/*
+ * after_nop -- get the address of the instruction
+ * following the nop.
+ */
+static unsigned char *
+after_nop(const struct range *nop)
+{
+	return nop->address + nop->size;
 }
 
 /*
  * activate_patches()
- * Loop over all the patches, and overwrite each syscall.
+ * Loop over all the patches, and and overwrite each syscall.
  */
 void
 activate_patches(struct intercept_desc *desc)
@@ -689,9 +691,6 @@ activate_patches(struct intercept_desc *desc)
 
 	for (unsigned i = 0; i < desc->count; ++i) {
 		const struct patch_desc *patch = desc->items + i;
-		debug_dump("\nactivating patch at dst_jmp_patch: 0x%lx - patch->return_address: 0x%lx - patch_n:%u\n"
-			"patch_absolute_return_address: %p\n",
-			patch->dst_jmp_patch-desc->base_addr,patch->return_address-desc->base_addr,i,patch->return_address);
 
 		if (patch->dst_jmp_patch < desc->text_start ||
 		    patch->dst_jmp_patch > desc->text_end)
@@ -713,38 +712,53 @@ activate_patches(struct intercept_desc *desc)
 			 * jump to the asm_wrapper.
 			 */
 			check_trampoline_usage(desc);
-			if (!patch->needs_compressed_ins) {
 
-				/* jump - escape the text segment */
-				create_j(patch->dst_jmp_patch, desc->next_trampoline);
+			/* jump - escape the text segment */
+			create_jump(JMP_OPCODE,
+				patch->dst_jmp_patch, desc->next_trampoline);
 
-				/*
-				 * if patch is 10 bytes long, fill the last two
-				 * with c.ebreak instruction. Template will jump back to the
-				 * return address so c.ebreak will never be executed as long
-				 * as the patching correctly the return jump from template.
-				 */
-				if (patch->padding_is_needed) {
-					*(uint16_t *)(patch->return_address-2) = 0x8002; // c.ebreak
-				}
-
-				/* jump - escape the 2 GB range of the text segment */
-				desc->next_trampoline = create_absolute_jump(
-					desc->next_trampoline, patch->asm_wrapper);
-			} else {
-				const int rem = (desc->next_trampoline - patch->dst_jmp_patch) % 4096;
-				if (rem) {
-					desc->next_trampoline += 4096 - rem;
-				}
-				create_c_j(patch->dst_jmp_patch, desc->next_trampoline);
-
-				desc->next_trampoline = create_absolute_jump(
-					desc->next_trampoline, patch->asm_wrapper);
-			}
+			/* jump - escape the 2 GB range of the text segment */
+			desc->next_trampoline = create_absolute_jump(
+				desc->next_trampoline, patch->asm_wrapper);
 		} else {
-			create_j(patch->dst_jmp_patch, patch->asm_wrapper);
+			create_jump(JMP_OPCODE,
+				patch->dst_jmp_patch, patch->asm_wrapper);
 		}
 
+		if (patch->uses_nop_trampoline) {
+			/*
+			 * Create a mini trampoline jump.
+			 * The first two bytes of the NOP instruction are
+			 * overwritten by a short jump instruction
+			 * (with 8 bit displacement), to make sure whenever
+			 * this the execution reaches the address where this
+			 * NOP resided originally, it continues uninterrupted.
+			 * The rest of the bytes occupied by this instruction
+			 * are used as an mini extra trampoline table.
+			 *
+			 * See also: the is_overwritable_nop function in
+			 * the intercept_desc.c source file.
+			 */
+
+			/* jump from syscall to mini trampoline */
+			create_short_jump(patch->syscall_addr,
+			    patch->dst_jmp_patch);
+
+			/*
+			 * Short jump to next instruction, skipping the newly
+			 * created trampoline jump.
+			 */
+			create_short_jump(patch->nop_trampoline.address,
+			    after_nop(&patch->nop_trampoline));
+		} else {
+			unsigned char *byte;
+
+			for (byte = patch->dst_jmp_patch + JUMP_INS_SIZE;
+				byte < patch->return_address;
+				++byte) {
+				*byte = INT3_OPCODE;
+			}
+		}
 	}
 
 	mprotect_no_intercept(first_page, size,

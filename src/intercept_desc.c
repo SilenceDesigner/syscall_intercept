@@ -61,8 +61,13 @@ static int
 open_orig_file(const struct intercept_desc *desc)
 {
 	int fd;
-
+#if defined(__x86_64__) || defined(_M_X64)
+	fd = syscall_no_intercept(SYS_open, desc->path, O_RDONLY);
+#elif defined(__riscv)
 	fd = syscall_no_intercept(SYS_openat, AT_FDCWD, desc->path, O_RDONLY);
+#else
+	#error "Unsupported ISA"
+#endif
 
 	xabort_on_syserror(fd, __func__);
 
@@ -353,9 +358,14 @@ find_jumps_in_section_rela(struct intercept_desc *desc, Elf64_Shdr *section,
 
 	for (size_t i = 0; i < sym_count; ++i) {
 		switch (ELF64_R_TYPE(syms[i].r_info)) {
+#if defined(__x86_64__) || defined(_M_X64)
 			case R_X86_64_RELATIVE:
 			case R_X86_64_RELATIVE64:
+#elif defined(__riscv)
 			case R_RISCV_RELATIVE:
+#else
+	#error "Unsupported ISA"
+#endif
 				/* Relocation type: "Adjust by program base" */
 
 				debug_dump("jump target: %lx\n",
@@ -526,7 +536,7 @@ crawl_text(struct intercept_desc *desc)
 			patch->preceding_ins_2 = prevs[0];
 			patch->preceding_ins = prevs[1];
 			patch->following_ins = result;
-			patch->syscall_addr = code - ECALL_INS_SIZE;
+			patch->syscall_addr = code - SYSCALL_INS_SIZE;
 
 			ptrdiff_t syscall_offset = patch->syscall_addr -
 			    (desc->text_start - desc->text_offset);
@@ -564,8 +574,15 @@ get_min_address(void)
 
 	min_address = 0x10000; /* best guess */
 
+#if defined(__x86_64__) || defined(_M_X64)
+	int fd = syscall_no_intercept(SYS_open, "/proc/sys/vm/mmap_min_addr",
+					O_RDONLY);
+#elif defined(__riscv)
 	int fd = syscall_no_intercept(SYS_openat, AT_FDCWD, "/proc/sys/vm/mmap_min_addr",
 					O_RDONLY);
+#else
+	#error "Unsupported ISA"
+#endif
 
 	if (fd >= 0) {
 		char line[64];
