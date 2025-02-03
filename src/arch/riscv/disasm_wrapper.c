@@ -99,20 +99,6 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 			result.has_ip_relative_opr = false;
 			result.uses_ra = false;
 			cs_riscv_op *op;
-//			for (uint8_t op_i = 0; !result.uses_ra &&
-//					 op_i < context->insn->detail->riscv.op_count; ++op_i) {
-//				op = context->insn->detail->riscv.operands + op_i;
-//				switch (op->type) {
-//					case RISCV_OP_REG:
-//						result.uses_ra = op->reg == RISCV_REG_RA;
-//						break;
-//					case RISCV_OP_MEM:
-//						result.uses_ra = op->mem.base == RISCV_REG_RA;
-//						break;
-//					default:
-//						break;
-//				}
-//			}
 			result.uses_t6 = false;
 			for (uint8_t op_i = 0; !result.uses_t6 &&
 					 op_i < context->insn->detail->riscv.op_count; ++op_i) {

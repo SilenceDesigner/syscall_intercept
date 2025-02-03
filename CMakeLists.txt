@@ -74,13 +74,14 @@ set(SOURCES_C
 	src/intercept_desc.c
 	src/intercept_log.c
 	src/intercept_util.c
-	src/patcher.c
+#	src/patcher.c
 	src/magic_syscalls.c
 	src/syscall_formats.c)
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 	set(SOURCES_C "${SOURCES_C}"
-		src/arch/x86_64/disasm_wrapper.c)
+		src/arch/x86_64/disasm_wrapper.c
+		src/arch/x86_64/patcher.c)
 
 	set(SOURCES_ASM
 		src/arch/x86_64/intercept_template.S
@@ -90,7 +91,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
 	set(SOURCES_C "${SOURCES_C}"
 		src/arch/riscv/disasm_wrapper.c
-	)
+		src/arch/riscv/patcher.c)
 
 	set(SOURCES_ASM
 		src/arch/riscv/intercept_template.S

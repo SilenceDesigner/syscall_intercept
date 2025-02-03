@@ -830,8 +830,13 @@ intercept_setup_log(const char *path, const char *trunc)
 
 	intercept_log_close(); /* in case a log was already open */
 
+#if defined(__x86_64__) || defined(_M_X64)
+	log_fd = (int)syscall_no_intercept(SYS_open, full_path, flags, 0700);
+#elif defined(__riscv)
 	log_fd = (int)syscall_no_intercept(SYS_openat, AT_FDCWD, full_path, flags, 0700);
-
+#else
+#error "Unsupported ISA"
+#endif
 	xabort_on_syserror(log_fd, "opening log");
 }
 

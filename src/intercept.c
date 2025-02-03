@@ -104,26 +104,56 @@ static void log_header(void);
 
 void __attribute__((noreturn)) xlongjmp(long rip, long rsp, long rax);
 
-/*
- * Kernel can clobber rcx and r11 while serving a syscall, those are ignored
- * The layout of this struct depends on the way the assembly wrapper saves
- * register on the stack.
- * Note: don't expect the SIMD array to be aligned for efficient use with
- * AVX instructions.
- */
-struct context {
-	long ra;
-	long t[5];
-	long sp;
-	struct patch_desc *patch_desc;
-	long a[8];
-	double ft[12];
-	double fa[8];
-};
+#if defined(__x86_64__) || defined(_M_X64)
+	/*
+	 * Kernel can clobber rcx and r11 while serving a syscall, those are ignored
+	 * The layout of this struct depends on the way the assembly wrapper saves
+	 * register on the stack.
+	 * Note: don't expect the SIMD array to be aligned for efficient use with
+	 * AVX instructions.
+	 */
+	struct context {
+		struct patch_desc *patch_desc;
+		long rip;
+		long r15;
+		long r14;
+		long r13;
+		long r12;
+		long r10;
+		long r9;
+		long r8;
+		long rsp;
+		long rbp;
+		long rdi;
+		long rsi;
+		long rbx;
+		long rdx;
+		long rax;
+		char padd[0x200 - 0x168]; /* see: stack layout in intercept_wrapper.s */
+		long SIMD[16][8]; /* 8 SSE, 8 AVX, or 16 AVX512 registers */
+	};
 
-struct wrapper_ret {
-	long a[2];
-};
+	struct wrapper_ret {
+		long rax;
+		long rdx;
+	};
+#elif defined(__riscv)
+	struct context {
+		long ra;
+		long t[5];
+		long sp;
+		struct patch_desc *patch_desc;
+		long a[8];
+		double ft[12];
+		double fa[8];
+	};
+
+	struct wrapper_ret {
+		long a[2];
+	};
+#else
+	#error "Unsupported ISA"
+#endif
 
 /* Should all objects be patched, or only libc and libpthread? */
 static bool patch_all_objs;
@@ -581,13 +611,13 @@ xabort_on_syserror(long syscall_result, const char *msg)
 static void
 get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 {
-	sys->nr = (int)context->a[7]; /* ignore higher 32 bits */
-	sys->args[0] = context->a[0];
-	sys->args[1] = context->a[1];
-	sys->args[2] = context->a[2];
-	sys->args[3] = context->a[3];
-	sys->args[4] = context->a[4];
-	sys->args[5] = context->a[5];
+	sys->nr = (int)SYSCALL_NR; /* ignore higher 32 bits */
+	sys->args[0] = FIRST_ARG_REG;
+	sys->args[1] = SECOND_ARG_REG;
+	sys->args[2] = THIRD_ARG_REG;
+	sys->args[3] = FOURTH_ARG_REG;
+	sys->args[4] = FIFTH_ARG_REG;
+	sys->args[5] = SIXTH_ARG_REG;
 }
 
 /*
@@ -634,7 +664,7 @@ intercept_routine(struct context *context)
 	// debug_dump("ra: %lx", context->ra);
 
 	if (handle_magic_syscalls(&desc, &result) == 0)
-		return (struct wrapper_ret){.a[0] = result, .a[1] = 1 };
+		return (struct wrapper_ret){FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 
 	intercept_log_syscall(patch, &desc, UNKNOWN, 0);
 
@@ -650,7 +680,7 @@ intercept_routine(struct context *context)
 
 	if (desc.nr == SYS_rt_sigreturn) {
 		/* can't handle these syscalls the normal way */
-		return (struct wrapper_ret){.a[0] = context->a[7], .a[1] = 0 };
+		return (struct wrapper_ret){FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 0 };
 	}
 
 	if (forward_to_kernel) {
@@ -668,13 +698,13 @@ intercept_routine(struct context *context)
 		 */
 		if (desc.nr == SYS_clone && desc.args[1] != 0) {
 			return (struct wrapper_ret){
-				.a[0] = context->a[7], .a[1] = 2 };
+				FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 2 };
 		}
 #ifdef SYS_clone3
 		else if (desc.nr == SYS_clone3 &&
 			((struct clone_args *)desc.args[0])->stack != 0) {
 			return (struct wrapper_ret){
-				.a[0] = context->a[7], .a[1] = 2 };
+				FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 2 };
 		}
 #endif
 		else
@@ -689,7 +719,7 @@ intercept_routine(struct context *context)
 
 	intercept_log_syscall(patch, &desc, KNOWN, result);
 	// debug_dump("intercepted ecall -> returning to asm_wrapper - result: %ld\n",result);
-	return (struct wrapper_ret){ .a[0] = result, .a[1] = 1 };
+	return (struct wrapper_ret){ FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 }
 
 /*
@@ -700,13 +730,13 @@ intercept_routine(struct context *context)
 struct wrapper_ret
 intercept_routine_post_clone(struct context *context)
 {
-	if (context->a[7] == 0) {
+	if (SYSCALL_NR == 0) {
 		if (intercept_hook_point_clone_child != NULL)
 			intercept_hook_point_clone_child();
 	} else {
 		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(context->a[7]);
+			intercept_hook_point_clone_parent(SYSCALL_NR);
 	}
 
-	return (struct wrapper_ret){.a[0] = context->a[7], .a[1] = 1 };
+	return (struct wrapper_ret){FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 1 };
 }
