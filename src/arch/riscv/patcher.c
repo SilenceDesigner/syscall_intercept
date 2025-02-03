@@ -266,7 +266,7 @@ check_surrounding_instructions(struct intercept_desc *desc,
 void
 create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 {
-	short min_treshold = JUMP_INS_SIZE;
+	unsigned short min_treshold = JUMP_INS_SIZE;
 	bool c_isa_supported = getauxval(AT_HWCAP) & COMPAT_HWCAP_ISA_C;
 	for (unsigned patch_i = 0; patch_i < desc->count; ++patch_i) {
 		struct patch_desc *patch = desc->items + patch_i;
@@ -292,7 +292,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 * be overwritten definitely, so length starts
 			 * as SYSCALL_INS_SIZE ( 4 bytes ).
 			 */
-			unsigned length = SYSCALL_INS_SIZE;
+			unsigned short length = SYSCALL_INS_SIZE;
 
 			patch->needs_compressed_ins = false;
 			patch->padding_is_needed = false;
@@ -442,20 +442,20 @@ init_patcher(void)
 }
 
 
-/*
- * create_ret_from_template
- * Write a RET instruction (encoded as JALR) to return to patch->return_address.
- * This is possible as long patch->return_address is saved to ra in the first
- * place when jumping to trampoline when intercepting the system call. This is
- * not explicitly written at the end of intercept_template.S since the fourth
- * overwritten instruction has to be relocated before RET.
- */
-static unsigned char *
-create_ret_from_template(unsigned char *code)
-{
-	*((uint32_t *)code) = 0x00008067; // jalr zero, ra, 0
-	return code + 4;
-}
+///*
+// * create_ret_from_template
+// * Write a RET instruction (encoded as JALR) to return to patch->return_address.
+// * This is possible as long patch->return_address is saved to ra in the first
+// * place when jumping to trampoline when intercepting the system call. This is
+// * not explicitly written at the end of intercept_template.S since the fourth
+// * overwritten instruction has to be relocated before RET.
+// */
+//static unsigned char *
+//create_ret_from_template(unsigned char *code)
+//{
+//	*((uint32_t *)code) = 0x00008067; // jalr zero, ra, 0
+//	return code + 4;
+//}
 
 /*
  * create_load_uint64t_into_t0
