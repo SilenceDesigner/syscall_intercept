@@ -197,6 +197,7 @@ calculate_table_count(const struct intercept_desc *desc)
 		return 1024;
 }
 
+#if defined(__x86_64__) || defined(_M_X64)
 /*
  * allocate_nop_table - allocates desc->nop_table
  */
@@ -222,6 +223,7 @@ mark_nop(struct intercept_desc *desc, unsigned char *address, size_t size)
 	desc->nop_table[desc->nop_count].size = size;
 	desc->nop_count++;
 }
+#endif
 
 /*
  * is_bit_set - check a bit in a bitmap
