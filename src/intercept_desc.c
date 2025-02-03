@@ -170,6 +170,7 @@ allocate_jump_table(struct intercept_desc *desc)
 	desc->jump_table = xmmap_anon(bytes / 8 + 1);
 }
 
+#if defined(__x86_64__) || defined(_M_X64)
 /*
  * calculate_table_count - estimate the number of entries
  * that might be used for nop table.
@@ -197,7 +198,6 @@ calculate_table_count(const struct intercept_desc *desc)
 		return 1024;
 }
 
-#if defined(__x86_64__) || defined(_M_X64)
 /*
  * allocate_nop_table - allocates desc->nop_table
  */
