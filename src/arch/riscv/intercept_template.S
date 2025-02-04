@@ -42,8 +42,6 @@
 .text
 
 /*
- * ld t0, 0(sp)
- * addi sp, sp, 16
  * preceding_ins_2
  * preceding_ins
  */
@@ -167,10 +165,8 @@ l5:
 intercept_asm_wrapper_tmpl_end:
     /*
      * This template must be appended here with a
-     * jump back to the intercepted code.
-     */
-
-    /*
-     * following_ins # !can't use ra as operand! need to check after disassembly
-     * create_absolute_jump(*dst, patch->return_address)
+     * jump back to the intercepted code, whic is written by
+     * create_absolute_jump(*dst, patch->return_address) in patcher.c
+     *
+     * following_ins
      */
