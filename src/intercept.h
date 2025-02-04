@@ -221,7 +221,7 @@ void activate_patches(struct intercept_desc *desc);
 #if defined(__x86_64__) || defined(_M_X64)
 	#define SYSCALL_INS_SIZE 2
 	#define JUMP_INS_SIZE 5
-	#define TRAMPOLINE_SIZE 14
+	#define TRAMPOLINE_SIZE 14 /* jmp instruction + pointer */
 	#define SYSCALL_NR context->rax
 	#define FIRST_ARG_REG context->rdi
 	#define SECOND_ARG_REG context->rsi
@@ -244,7 +244,7 @@ void activate_patches(struct intercept_desc *desc);
 	 * a PC-relative jump with a 32-bit offset
 	 */
 	#define JUMP_INS_SIZE 8
-	#define TRAMPOLINE_SIZE 92
+	#define TRAMPOLINE_SIZE 92 /* see create_absolute_jump() in arch/riscv/patcher.c */
 	#define SYSCALL_NR context->a[7]
 	#define FIRST_ARG_REG context->a[0]
 	#define SECOND_ARG_REG context->a[1]

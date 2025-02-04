@@ -46,6 +46,8 @@
 .globl intercept_routine_post_clone
 .type intercept_routine_post_clone, @function
 
+.globl is_v_extension_supported
+
 .text
 
 intercept_wrapper:
