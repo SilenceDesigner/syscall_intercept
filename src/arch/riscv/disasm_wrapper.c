@@ -72,7 +72,8 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 #endif
 
 	switch (context->insn->id) {
-		case RISCV_INS_BEQ: // PC-relative jumps
+    	/* PC-relative jumps */
+		case RISCV_INS_BEQ:
 		case RISCV_INS_BGE:
 		case RISCV_INS_BGEU:
 		case RISCV_INS_BLT:
@@ -92,12 +93,15 @@ intercept_disasm_next_instruction(struct intercept_disasm_context *context,
 		case RISCV_INS_JALR:
         case RISCV_INS_C_JR:
 		case RISCV_INS_C_JALR:
+        case RISCV_INS_MRET:
+		case RISCV_INS_SRET:
+		case RISCV_INS_URET:
 			result.is_jump = true;
 			break;
 		default:
 			result.is_jump = false;
 			result.has_ip_relative_opr = false;
-			result.uses_ra = false;
+//			result.uses_ra = false;
 			cs_riscv_op *op;
 			result.uses_t6 = false;
 			for (uint8_t op_i = 0; !result.uses_t6 &&
