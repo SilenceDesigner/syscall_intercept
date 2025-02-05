@@ -159,11 +159,11 @@ is_copiable_before_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-	    ins.is_call ||
+//	    ins.is_call ||
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
-	    ins.is_ret ||
-	    ins.is_endbr ||
+//	    ins.is_ret ||
+//	    ins.is_endbr ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
 }
@@ -182,10 +182,10 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-	    ins.is_call ||
+//	    ins.is_call ||
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
-	    ins.is_endbr ||
+//	    ins.is_endbr ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
 }
@@ -328,7 +328,6 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
              */
 			if (length > JUMP_INS_SIZE) {
 				patch->padding_is_needed = true;
-				// patch->return_address -= (length - JUMP_INS_SIZE);
 			}
 
 			/*
@@ -538,7 +537,6 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 		*dst = relocate_instruction(*dst, &patch->following_ins);
 
 	*dst = create_absolute_jump(*dst, patch->return_address);
-	// *dst = create_ret_from_template(*dst);
 }
 
 /*
