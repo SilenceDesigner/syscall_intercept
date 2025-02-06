@@ -452,6 +452,87 @@ static const struct syscall_format formats[] = {
 #ifdef SYS_pkey_free
 	SARGS(pkey_free, rdec, arg_),
 #endif
+#ifdef SYS_io_pgetevents
+	SARGS(io_pgetevents, rdec, arg_dec, arg_dec, arg_dec, arg_pointer, arg_pointer, arg_pointer),
+#endif
+#ifdef SYS_rseq
+	SARGS(rseq, rdec, arg_pointer, arg_dec32, arg_, arg_dec32),
+#endif
+#ifdef SYS_pidfd_send_signal
+	SARGS(pidfd_send_signal, rdec, arg_dec32, arg_dec32, arg_pointer, arg_),
+#endif
+#ifdef SYS_io_uring_setup
+	SARGS(io_uring_setup, rdec, arg_dec32, arg_pointer),
+#endif
+#ifdef SYS_io_uring_enter
+	SARGS(io_uring_enter, rdec, arg_fd, arg_dec32, arg_dec32, arg_, arg_pointer),
+#endif
+#ifdef SYS_io_uring_register
+	SARGS(io_uring_register, rdec, arg_fd, arg_, arg_pointer, arg_dec32),
+#endif
+#ifdef SYS_open_tree
+	SARGS(open_tree, rdec, arg_atfd, arg_cstr, arg_open_flags),
+#endif
+#ifdef SYS_move_mount
+	SARGS(move_mount, rdec, arg_fd, arg_cstr, arg_atfd, arg_cstr, arg_),
+#endif
+#ifdef SYS_fsopen
+	SARGS(fsopen, rdec, arg_cstr, arg_),
+#endif
+#ifdef SYS_fsconfig
+	SARGS(fsconfig, rdec, arg_pointer, arg_dec32, arg_cstr, arg_pointer, arg_),
+#endif
+#ifdef SYS_fsmount
+	SARGS(fsmount, rdec, arg_fd, arg_),
+#endif
+#ifdef SYS_fspick
+	SARGS(fspick, rdec, arg_atfd, arg_cstr, arg_),
+#endif
+#ifdef SYS_pidfd_open
+	SARGS(pidfd_open, rdec, arg_dec32, arg_),
+#endif
+#ifdef SYS_clone3
+	SARGS(clone3, rdec, arg_pointer, arg_dec32),
+#endif
+#ifdef SYS_close_range
+	SARGS(close_range, rdec, arg_dec32, arg_dec32, arg_),
+#endif
+#ifdef SYS_openat2
+	SARGS(openat2, rdec, arg_cstr, arg_pointer, arg_dec32),
+#endif
+#ifdef SYS_pidfd_getfd
+	SARGS(pidfd_getfd, rdec, arg_fd, arg_fd, arg_),
+#endif
+#ifdef SYS_faccessat2
+	SARGS(faccessat2, rdec, arg_atfd, arg_cstr, arg_oct_mode, arg_),
+#endif
+#ifdef SYS_process_madvise
+	SARGS(process_madvise, rdec, arg_fd, arg_pointer, arg_dec32, arg_),
+#endif
+#ifdef SYS_epoll_pwait2
+	SARGS(epoll_pwait2, rdec, arg_fd, arg_pointer, arg_dec32, arg_pointer, arg_pointer),
+#endif
+#ifdef SYS_mount_setattr
+	SARGS(mount_setattr, rdec, arg_fd, arg_cstr, arg_, arg_pointer, arg_dec32),
+#endif
+#ifdef SYS_quotactl_fd
+	SARGS(quotactl_fd, rdec, arg_fd, arg_dec32, arg_dec32, arg_pointer),
+#endif
+#ifdef SYS_landlock_create_ruleset
+	SARGS(landlock_create_ruleset, rdec, arg_pointer, arg_dec32, arg_),
+#endif
+#ifdef SYS_landlock_add_rule
+	SARGS(landlock_add_rule, rdec, arg_fd, arg_dec32, arg_pointer, arg_),
+#endif
+#ifdef SYS_landlock_restrict_self
+	SARGS(landlock_restrict_self, rdec, arg_fd, arg_),
+#endif
+#ifdef SYS_memfd_secret
+	SARGS(memfd_secret, rdec, arg_),
+#endif
+#ifdef SYS_process_mrelease
+	SARGS(process_mrelease, rdec, arg_fd, arg_)
+#endif
 };
 /* END CSTYLED */
 
