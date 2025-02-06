@@ -67,7 +67,7 @@ struct intercept_disasm_result {
 	/* as of now this only refers to endbr64 */
 	bool is_endbr;
 
-	/* Flag marking if t6 is one of the operands of the instruction*/
+	/* Flag marking if t6 is one of the operands of the instruction */
 	bool uses_t6;
 
 	/*
