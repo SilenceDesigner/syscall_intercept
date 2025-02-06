@@ -24,7 +24,7 @@ this purpose. Different instances are generated from this template to
 different locations in memory, all of which are able to jump back to the
 right address in the intercepted code. These instance are also equipped with
 an another information specific to a syscall: a pointer to the
-[struct patch_desc](intercept.h#L92) instance associated with the
+[struct patch_desc](../../intercept.h#L92) instance associated with the
 particular patched syscall.
 
 An illustration of this with two syscalls in a section of intercepted code:
@@ -128,7 +128,7 @@ jumping back to the intercepted code, once everything is done.
 
   Following a clone syscall, the execution of a program might continue with
 a different stack pointer (e.g. after creating a new thread). This poses a problem
-when such a syscall is executed in the [intercept_routine](intercept.c#L650),
+when such a syscall is executed in the [intercept_routine](../../intercept.c#L650),
 which is a C function. This function would attempt to log the result of the syscall,
 then proceed to return to the calling side, which involves restoring the saved
 registers. But the saved registers would be restored from a location
@@ -143,7 +143,7 @@ site. At this point, no stack is used (all registers are already restored), so
 the syscall's modification of the stack pointer is not relevant. The process is
 as follows:
 
-  1) The C intercept_routine [indicates](intercept.c#L646) this
+  1) The C intercept_routine [indicates](../../intercept.c#L646) this
      special case to the asm wrappers, by returning 2 in the rdx register.
      The register RDX is used because the C ABI allows return two values
      (a struct) in RAX and RDX. Normally RAX is used as the return value of
@@ -170,7 +170,7 @@ jumping to back to the beginning of the wrapper code in
 this is case that the value of RAX is not a syscall number, but the result
 of a clone syscall. Of course the hooking code would be able to figure this
 out on its own, by just examining the value of RAX, so it is indicated by
-calling a different C function: [intercept_routine_post_clone](intercept.c#L670).
+calling a different C function: [intercept_routine_post_clone](../../intercept.c#L670).
 Which function to call is controlled by another value passed in RCX, as seen in
 the branch in [intercept_wrapper.s](intercept_wrapper.s#L165).
 
