@@ -661,8 +661,6 @@ intercept_routine(struct context *context)
 
 	get_syscall_in_context(context, &desc);
 
-	// debug_dump("ra: %lx", context->ra);
-
 	if (handle_magic_syscalls(&desc, &result) == 0)
 		return (struct wrapper_ret){FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 
@@ -718,7 +716,6 @@ intercept_routine(struct context *context)
 	}
 
 	intercept_log_syscall(patch, &desc, KNOWN, result);
-	// debug_dump("intercepted ecall -> returning to asm_wrapper - result: %ld\n",result);
 	return (struct wrapper_ret){ FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 }
 
