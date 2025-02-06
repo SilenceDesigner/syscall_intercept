@@ -1,17 +1,18 @@
 # syscall_intercept
 
-[![Build Status](https://travis-ci.org/pmem/syscall_intercept.svg)](https://travis-ci.org/pmem/syscall_intercept)
-[![Coverage Status](https://codecov.io/github/pmem/syscall_intercept/coverage.svg)](https://codecov.io/gh/pmem/syscall_intercept)
-[![Coverity Scan Build Status](https://scan.coverity.com/projects/12890/badge.svg)](https://scan.coverity.com/projects/syscall_intercept)
+[//]: # ([![Build Status]&#40;https://travis-ci.org/pmem/syscall_intercept.svg&#41;]&#40;https://travis-ci.org/pmem/syscall_intercept&#41;)
 
-This repository is a port to risc-V of the [syscall_intercept library](https://github.com/pmem/syscall_intercept).
-Userspace syscall intercepting library.
+[//]: # ([![Coverage Status]&#40;https://codecov.io/github/pmem/syscall_intercept/coverage.svg&#41;]&#40;https://codecov.io/gh/pmem/syscall_intercept&#41;)
+
+[//]: # ([![Coverity Scan Build Status]&#40;https://scan.coverity.com/projects/12890/badge.svg&#41;]&#40;https://scan.coverity.com/projects/syscall_intercept&#41;)
+
+This repository contains a multi-architecture porting of [syscall_intercept](https://github.com/pmem/syscall_intercept) working on both x86_64 and RISC-V
 
 # Dependencies #
 
 ## Runtime dependencies ##
 
- * libcapstone -- the disassembly engine used under the hood
+ * libcapstone -- the disassembly engine used under the hood (RISC-V support requires version 5.0 or higher)
 
 ## Build dependencies ##
 
@@ -53,10 +54,13 @@ There is an install target. For now, all it does, is cp.
 make install
 ```
 
-Coming soon:
-```sh
-make test
-```
+[//]: # (Coming soon:)
+
+[//]: # (```sh)
+
+[//]: # (make test)
+
+[//]: # (```)
 
 # Synopsis #
 
@@ -92,7 +96,7 @@ to signal to the intercepting library that the specific system
 call was ignored by the user and the original syscall should be
 executed. A zero return value signals that the user takes over the
 system call. In this case, the result of the system call
-(the value stored in the RAX register after the system call)
+(the value stored in the x86_64 `%rax` or RISC-V `$a0` register after the system call)
 can be set via the *result pointer. In order to use the library,
 the intercepting code is expected to be loaded using the
 LD_PRELOAD feature provided by the system loader.
@@ -182,7 +186,7 @@ ls: reading directory '.': Operation not supported
 In order to handle syscalls in user space, the library relies
 on the following assumptions:
 
-- Each syscall made by the applicaton is issued via libc
+- Each syscall made by the application is issued via libc
 - No other facility attempts to hotpatch libc in the same process
 - The libc implementation is already loaded in the processes
 memory space when the intercepting library is being initialized
@@ -193,27 +197,29 @@ for the methods listed in this section
 ##### Disassembly: #####
 The library disassembles the text segment of the libc loaded
 into the memory space of the process it is initialized in. It
-locates all syscall instructions, and replaces each of them
-with a jump to a unique address. Since the syscall instruction
-of the x86_64 ISA occupies only two bytes, the method involves
+locates all `syscall` or `ecall` instructions, and replaces each of them
+with a jump to a unique address. Since x86_64 ISA `syscall` instruction
+occupies only two bytes and the RV64G ISA `ecall` instruction occupies only four, the method involves
 locating other bytes close to the syscall suitable for overwriting.
-The destination of the jump (unique for each syscall) is a
+The destination of the jump (unique for each `syscall` or `ecall`) is a
 small routine, which accomplishes the following tasks:
 
 1. Optionally executes any instruction that originally
-preceded the syscall instruction, and was overwritten to
+preceded the system call instruction, and was overwritten to
 make space for the jump instruction
 2. Saves the current state of all registers to the stack
 3. Translates the arguments (in the registers) from
-the Linux x86_64 syscall calling convention to the C ABI's
-calling convention used on x86_64
+the Linux kernel-level ABI calling conventions of the targeted architecture to
+the C user-space functions calling convention
 4. Calls a function written in C (which in turn calls
 the callback supplied by the library user)
 5. Loads the values from the stack back into the registers
 6. Jumps back to libc, to the instruction following the
 overwritten part
 
-##### In action: #####
+### In action: ###
+
+#### x86_64 ####
 
 *Simple hotpatching:*
 Replace a mov and a syscall instruction with a jmp instruction
@@ -270,18 +276,49 @@ Before:                         After:
 
 ```
 
+#### RISC-V ####
+
+```
+Before:                                       After:
+00000000000aa1b8 <__open>:                    00000000000aa1b8 <__open>:
+aa1b8: c.addi16sp sp,-112                     aa1b8: c.addi16sp sp,-112
+...                                           ...
+aa1fa: addi     a7,zero,56                    aa1fa: addi     a7,zero,56
+aa1fe: addi     a0,zero,-100                  aa1fe: auipc    t6, {trampoline[31:12], 12'b0} \
+aa202: c.mv     a2,s0                       /-aa202: jalr     zero, t6, trampoline[11:0]      | patch  
+aa204: ecall                                | aa206: c.ebreak _______________________________/
+aa208: c.lui    a5,0xfffff                  | aa208: c.lui    a5,0xfffff              <------\
+aa20a: bltu     a5,a0,aa262 <__open+0xaa>   | aa20a: bltu     a5,a0,aa262 <__open+0xaa>       \
+...                                         | ...                                             |
+                                            | 00000000abcdef02 <trampoline_table>             |
+                                            | ...                                             |
+                                            \-# jump to                                       |
+                                            /-# asm_wrapper_space                             |
+                                            | ...                                             |
+                                            | 0000000008000000 <asm_wrapper_space>            |
+                                            | ...                                             |
+                                            \-8000100: addi     a0,zero,-100                  |
+                                              8000104: c.mv     a2,s0                         |
+                                              8000106: # rest of interception code            |
+                                              ...                                             /
+                                              8000200: # jump back to original .so __________/
+```
+
 # Limitations: #
 * Only Linux is supported
-* Only x86\_64 is supported
+* Only x86\_64 and RISC-V are supported
 * Only tested with glibc, although perhaps it works
 with some other libc implementations as well
-* There are known issues with the following syscalls:
+* RISC-V version assumes `$t6` is not used as base pointer or as source
+register without being reinitialized after an `ecall` and before the ending of
+a function (tested with glibc 2.35, 2.37 and 2.39)
+* There are known issues with the following system calls:
   * clone
   * rt_sigreturn
 
 # Debugging: #
 Besides logging, the most important factor during debugging is to make
-sure the syscalls in the debugger are not intercepted. To achieve this, use
+sure the system calls in the debugger are not intercepted. To achieve this, use
 the INTERCEPT_HOOK_CMDLINE_FILTER variable described above.
 
 ```
