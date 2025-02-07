@@ -23,7 +23,7 @@ jumps. The code in [intercept_template.s](intercept_template.s) serves
 this purpose. Different instances are generated from this template to
 different locations in memory, all of which are able to jump back to the
 right address in the intercepted code. These instance are also equipped with
-an another information specific to a syscall: a pointer to the
+another information specific to a syscall: a pointer to the
 [struct patch_desc](../../intercept.h#L92) instance associated with the
 particular patched syscall.
 
