@@ -45,9 +45,11 @@
 # trampoline table has the same format, each mock entry has the same size as
 # as such a trampoline jump would have. Since these patched syscalls are
 # never executed in these low level tests, these jumps don't need to be
-# real functioning jumps, thus their destination is ".space 92, 0" in all
+# real functioning jumps, thus their destination is ".space 8, 0" in all
 # cases -- the only thing that matters, is to have these at predictable
 # addresses.
+
+.intel_syntax noprefix
 
 .global trampoline_table;
 .global trampoline_table_end;
@@ -55,52 +57,52 @@
 .data
 
 trampoline_table:
-dst0:
-		.space 92, 0
-dst1:
-		.space 92, 0
-dst2:
-		.space 92, 0
-dst3:
-		.space 92, 0
-dst4:
-		.space 92, 0
-dst5:
-		.space 92, 0
-dst6:
-		.space 92, 0
-dst7:
-		.space 92, 0
-dst8:
-		.space 92, 0
-dst9:
-		.space 92, 0
-dst10:
-		.space 92, 0
-dst11:
-		.space 92, 0
-dst12:
-		.space 92, 0
-dst13:
-		.space 92, 0
-dst14:
-		.space 92, 0
-dst15:
-		.space 92, 0
-dst16:
-		.space 92, 0
-dst17:
-		.space 92, 0
-dst18:
-		.space 92, 0
-dst19:
-		.space 92, 0
-dst20:
-		.space 92, 0
-dst21:
-		.space 92, 0
-dst22:
-		.space 92, 0
-dst23:
-		.space 92, 0
+dst0:		jmp     [rip]
+		.space 8, 0
+dst1:		jmp     [rip]
+		.space 8, 0
+dst2:		jmp     [rip]
+		.space 8, 0
+dst3:		jmp     [rip]
+		.space 8, 0
+dst4:		jmp     [rip]
+		.space 8, 0
+dst5:		jmp     [rip]
+		.space 8, 0
+dst6:		jmp     [rip]
+		.space 8, 0
+dst7:		jmp     [rip]
+		.space 8, 0
+dst8:		jmp     [rip]
+		.space 8, 0
+dst9:		jmp     [rip]
+		.space 8, 0
+dst10:		jmp     [rip]
+		.space 8, 0
+dst11:		jmp     [rip]
+		.space 8, 0
+dst12:		jmp     [rip]
+		.space 8, 0
+dst13:		jmp     [rip]
+		.space 8, 0
+dst14:		jmp     [rip]
+		.space 8, 0
+dst15:		jmp     [rip]
+		.space 8, 0
+dst16:		jmp     [rip]
+		.space 8, 0
+dst17:		jmp     [rip]
+		.space 8, 0
+dst18:		jmp     [rip]
+		.space 8, 0
+dst19:		jmp     [rip]
+		.space 8, 0
+dst20:		jmp     [rip]
+		.space 8, 0
+dst21:		jmp     [rip]
+		.space 8, 0
+dst22:		jmp     [rip]
+		.space 8, 0
+dst23:		jmp     [rip]
+		.space 8, 0
 trampoline_table_end:
