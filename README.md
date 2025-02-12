@@ -314,9 +314,6 @@ with some other libc implementations as well
 * RISC-V version assumes `$t6` is not used as base pointer or as source
 register without being reinitialized after an `ecall` and before the ending of
 a function (tested with glibc 2.35, 2.37 and 2.39)
-* There are known issues with the following system calls:
-  * clone
-  * rt_sigreturn
 
 # Debugging: #
 Besides logging, the most important factor during debugging is to make
