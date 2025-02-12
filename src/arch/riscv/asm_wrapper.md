@@ -27,7 +27,7 @@ register while the `jalr` adds a 12-bit signed offset to the value saved in
 that register and perform an absolute jump to the obtained result address.
 `jalr` is able of writing the return address into `$ra` but `ecall` is not
 concerned by user-space calling conventions. For that reason saving the return
-address in `$ra` with `jalr` would cause disruptive behaviour in leaf procedure.
+address in `$ra` with `jalr` would cause disruptive behaviour in leaf procedures.
 The following function is an example from glibc v2.35 binary:
 
 ```asm
@@ -77,29 +77,29 @@ write a 32-bit constant into a register with the `lui`+`addi` sequence, which
 handles the most significant 20 bit with the first instruction and the least
 significant 12 with the latter. Difficulties originate from 32-bit addresses
 being impossible to just be split into a 20-bit upper immediate for auipc and a
-12-bit lower offset for jalr, as both instructions accept signed immediate
+12-bit lower offset for `jalr`, as both instructions accept signed immediate
 values: the `auipc` instruction stores a multiple of 4096 into its destination
 register, and `jalr` sums an immediate offset in the range [−2048, 2046]. To
 solve this inconsistency, each destination address whose remainder, divided by
 4096, is 2048 or more will result in auipc encoding the next higher multiple of
-4096 so that jalr can compute the correct destination using a negative offset.
+4096 so that `jalr` can compute the correct destination using a negative offset.
 A 64-bit constant is even more complex since it relies on building the two
 halves of the constant while making sure the lower half is not sign extended.
 This requires using a mask whose construction must deals with sign extension
 itself. With this caution, building the 64-bit constant is in the end possible
 by just logical ORing the upper half and the lower half.
-The following lines constitute a typical machine language trampoline expressed
+The following lines constitute a typical machine language trampoline
 wrote as a sequence of assembly instructions:
 ```asm
 addi    sp, sp, -32
 sd      t1, 0(sp)
 sd      t2, 8(sp)
 sd      t3, 16(sp)
-lui     t6, 0x12345
-addi    t6, t6, 0x678
+lui     t6, 0x12345 #placeholder value
+addi    t6, t6, 0x678 #placeholder value
 slli    t6, t6, 32
-lui     t3, 0x9abcd
-addi    t3, t3, 0xef0
+lui     t3, 0x90abcd #placeholder value
+addi    t3, t3, 0xdef #placeholder value
 lui     t1, 0x7ffff
 ori     t2, zero, 0x7ff
 slli    t2, t2, 1
@@ -117,6 +117,6 @@ jalr    zero, t6, 0
 ```
 `$t6` keeps being used as the source register for the jump destination since
 it's already clobbered, while `$t1`, `$t2` and `$t3`are preserved.
-The same 64-bit constant building sequence is appended to each interception
-template to be able to return to the patched shared object without needing
-`$ra`.
+The same 64-bit constant building sequence is appended to each occurrence of the
+interception template to be able to return to the patched shared object without
+using `$ra`.

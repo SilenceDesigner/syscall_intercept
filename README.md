@@ -12,7 +12,9 @@ This repository contains a multi-architecture porting of [syscall_intercept](htt
 
 ## Runtime dependencies ##
 
- * libcapstone -- the disassembly engine used under the hood (RISC-V support requires version 5.0 or higher)
+ * libcapstone -- the disassembly engine used under the hood
+   (RISC-V support requires version **5.0** or higher, while apt installs version 4.0.2 by default, as february 2025).
+   Compiling capstone by hand will require setting [CMakeLists.txt](CMakeLists.txt#L109) accordingly 
 
 ## Build dependencies ##
 
@@ -329,3 +331,10 @@ INTERCEPT_HOOK_CMDLINE_FILTER=ls \
 
 With this filtering, the intercepting library is not activated in the gdb
 process itself.
+
+# RISC-V porting #
+
+Ottavio Monticelli <ottavio.monticelli@edu.unito.it> (Maintainer) \
+Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Maintainer) \
+Marco Aldinucci <marco.aldinucci@unito.it> (Maintainer) \
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Maintainer)
