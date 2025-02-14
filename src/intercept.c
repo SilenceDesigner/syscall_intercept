@@ -676,8 +676,11 @@ intercept_routine(struct context *context)
 		    desc.args[4],
 		    desc.args[5],
 		    &result);
-
+#if defined(__x86_64__) || defined(_M_X64)
+	if (desc.nr == SYS_vfork || desc.nr == SYS_rt_sigreturn) {
+#elif defined(__riscv)
 	if (desc.nr == SYS_rt_sigreturn) {
+#endif
 		/* can't handle these syscalls the normal way */
 		return (struct wrapper_ret){FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 0 };
 	}
