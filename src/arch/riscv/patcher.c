@@ -164,7 +164,6 @@ is_copiable_before_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-	    ins.is_rel_jump ||
 	    ins.is_jump ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
@@ -184,7 +183,6 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-	    ins.is_rel_jump ||
 	    ins.is_jump ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
