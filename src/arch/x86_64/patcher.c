@@ -1,4 +1,5 @@
 /*
+ * Copyright 2025, University of Turin
  * Copyright 2016-2024, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
@@ -81,7 +82,7 @@
 #include <stdio.h>
 
 /* The size of a trampoline jump, jmp instruction + pointer */
-//enum { TRAMPOLINE_SIZE = 6 + 8 };
+enum { TRAMPOLINE_SIZE = 6 + 8 };
 
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
 

@@ -85,6 +85,9 @@
 #define COMPAT_HWCAP_ISA_C (1 << ('C' - 'A'))
 #define COMPAT_HWCAP_ISA_V (1 << ('V' - 'A'))
 
+/* The size of a trampoline jump, see src/arch/riscv/asm_wrapper.md */
+enum { TRAMPOLINE_SIZE = 4 * 23 };
+
 static void create_wrapper(struct patch_desc *patch, unsigned char **dst);
 static void create_load_uint64t_into_t0(uint8_t *code, uint64_t value);
 static void create_load_uint64t_into_t6(uint8_t *code, uint64_t value);
@@ -120,7 +123,8 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
 	instructions[21] = 0x02010113; // addi sp, sp, 32
 	instructions[22] = 0x000f8067; // jalr zero, t6, 0
-	create_load_uint64t_into_t6((uint8_t *)(instructions + 4),(uint64_t)to); // writes 5 instructions starting from instructions[4]
+    // next call writes five 4-byte instructions starting from instructions[4]
+	create_load_uint64t_into_t6((uint8_t *)(instructions + 4),(uint64_t)to);
 	return (unsigned char *)(instructions + 23);
 }
 
@@ -160,11 +164,8 @@ is_copiable_before_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-//	    ins.is_call ||
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
-//	    ins.is_ret ||
-//	    ins.is_endbr ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
 }
@@ -183,10 +184,8 @@ is_copiable_after_syscall(struct intercept_disasm_result ins)
 		return false;
 
 	return !(ins.has_ip_relative_opr ||
-//	    ins.is_call ||
 	    ins.is_rel_jump ||
 	    ins.is_jump ||
-//	    ins.is_endbr ||
 	    ins.is_syscall ||
 	    ins.uses_t6);
 }
@@ -528,7 +527,7 @@ create_wrapper(struct patch_desc *patch, unsigned char **dst)
 	}
 
 	memcpy(*dst, intercept_asm_wrapper_tmpl, asm_wrapper_tmpl_size);
-	create_load_uint64t_into_t0(*dst + o_patch_desc_addr, (uintptr_t)patch); // why the uintptr_t cast? What if the address is not representable on 32 bit?
+	create_load_uint64t_into_t0(*dst + o_patch_desc_addr, (uintptr_t)patch);
 	create_load_uint64t_into_t0(*dst + o_wrapper_level1_addr,
 				(uintptr_t)&intercept_wrapper);
 	*dst += asm_wrapper_tmpl_size;
