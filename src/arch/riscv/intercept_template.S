@@ -165,9 +165,10 @@ l5:
 
 intercept_asm_wrapper_tmpl_end:
     /*
+     * following_ins
+     *
      * This template must be appended here with a
      * jump back to the intercepted code, whic is written by
      * create_absolute_jump(*dst, patch->return_address) in patcher.c
      *
-     * following_ins
      */
