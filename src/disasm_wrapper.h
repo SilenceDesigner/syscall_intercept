@@ -65,11 +65,12 @@ struct intercept_disasm_result {
 	 */
 	bool has_ip_relative_opr;
 
+	bool is_jump;
+
+#if defined(__x86_64__) || defined(_M_X64)
+
 	/* as of now this only refers to endbr64 */
 	bool is_endbr;
-
-	/* Flag marking if t6 is one of the operands of the instruction */
-	bool uses_t6;
 
 	/*
 	 * Flag marking lea instructions setting a 64 bit register to a
@@ -85,8 +86,6 @@ struct intercept_disasm_result {
 
 	/* call instruction */
 	bool is_call;
-
-	bool is_jump;
 
 	/*
 	 * The flag is_rel_jump marks any instruction that jumps, to
@@ -111,6 +110,13 @@ struct intercept_disasm_result {
 	 */
 	int32_t rip_disp;
 	const unsigned char *rip_ref_addr;
+
+#elif defined(__riscv)
+
+	/* Flag marking if t6 is one of the operands of the instruction */
+	bool uses_t6;
+
+#endif
 
 #ifndef NDEBUG
 	const char *mnemonic;
