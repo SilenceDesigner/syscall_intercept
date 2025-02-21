@@ -30,32 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "libsyscall_intercept_hook_point.h"
-#include <stddef.h>
-#include <syscall.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdio.h>
 #include <fcntl.h>
-
-static int
-hook(long syscall_number,
-     long arg0, long arg1,
-     long arg2, long arg3,
-     long arg4, long arg5,
-     long *result)
-{
-  if (syscall_number == SYS_fcntl) {
-    write(1,"Proof of fcntl64 interception\n",30);
-  }
-  return 1;
-}
-
-static __attribute__((constructor)) void
-init(void)
-{
-    intercept_hook_point = hook;
-}
 
 int main() {
     int fd = openat(AT_FDCWD, "intercepting_original_file.txt", O_RDONLY);

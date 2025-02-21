@@ -33,9 +33,6 @@
 #include "libsyscall_intercept_hook_point.h"
 #include <stddef.h>
 #include <syscall.h>
-#include <string.h>
-#include <unistd.h>
-#include <stdio.h>
 
 
 static int hook(long syscall_number,

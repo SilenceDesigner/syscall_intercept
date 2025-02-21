@@ -1,6 +1,5 @@
 /*
  * Copyright 2025, University of Turin
- * Copyright 2017-2024, Intel Corporation
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,12 +31,8 @@
  */
 
 #include "libsyscall_intercept_hook_point.h"
-#include <stddef.h>
 #include <syscall.h>
-#include <string.h>
 #include <unistd.h>
-#include <stdio.h>
-#include <fcntl.h>
 
 
 static int hook(long syscall_number,
