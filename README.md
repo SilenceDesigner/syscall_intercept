@@ -333,5 +333,5 @@ process itself.
 
 Ottavio Monticelli <ottavio.monticelli@edu.unito.it> (Maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Maintainer) \
-Marco Aldinucci <marco.aldinucci@unito.it> (Maintainer) \
-Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Maintainer)
+Marco Aldinucci <marco.aldinucci@unito.it> (Maintainer and Principal Investigator) \
+Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Maintainer and Principal Investigator)
