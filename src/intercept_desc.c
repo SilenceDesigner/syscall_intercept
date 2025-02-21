@@ -419,6 +419,8 @@ add_new_patch(struct intercept_desc *desc)
 	return &(desc->items[desc->count++]);
 }
 
+
+#if defined(__x86_64__) || defined(_M_X64)
 /*
  * is_overwritable_nop
  * Check if an instruction just disassembled is a NOP that can be
@@ -447,6 +449,7 @@ is_overwritable_nop(const struct intercept_disasm_result *ins)
 {
 	return ins->is_nop && ins->length >= 2 + 5;
 }
+#endif
 
 /*
  * crawl_text
