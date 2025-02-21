@@ -220,18 +220,7 @@ void mprotect_asm_wrappers(void);
 void activate_patches(struct intercept_desc *desc);
 
 #if defined(__x86_64__) || defined(_M_X64)
-	#define SYSCALL_INS_SIZE 2
-	#define JUMP_INS_SIZE 5
-	#define TRAMPOLINE_SIZE 14 /* jmp instruction + pointer */
-	#define SYSCALL_NR context->rax
-	#define FIRST_ARG_REG context->rdi
-	#define SECOND_ARG_REG context->rsi
-	#define THIRD_ARG_REG context->rdx
-	#define FOURTH_ARG_REG context->r10
-	#define FIFTH_ARG_REG context->r8
-	#define SIXTH_ARG_REG context->r9
-	#define FIRST_RET_REG .rax
-	#define SECOND_RET_REG .rdx
+	#define PARAM_BY_ARCH(opt1, opt2) opt1
 	#define CALL_OPCODE 0xe8
 	#define JMP_OPCODE 0xe9
 	#define SHORT_JMP_OPCODE 0xeb
@@ -239,25 +228,22 @@ void activate_patches(struct intercept_desc *desc);
 	#define NOP_OPCODE 0x90
 	#define INT3_OPCODE 0xCC
 #elif defined(__riscv)
-	#define SYSCALL_INS_SIZE 4
-	/*
-	 * 8 bytes are needed to be able to perform
-	 * a PC-relative jump with a 32-bit offset
-	 */
-	#define JUMP_INS_SIZE 8
-	#define TRAMPOLINE_SIZE 92 /* see create_absolute_jump() in arch/riscv/patcher.c */
-	#define SYSCALL_NR context->a[7]
-	#define FIRST_ARG_REG context->a[0]
-	#define SECOND_ARG_REG context->a[1]
-	#define THIRD_ARG_REG context->a[2]
-	#define FOURTH_ARG_REG context->a[3]
-	#define FIFTH_ARG_REG context->a[4]
-	#define SIXTH_ARG_REG context->a[5]
-	#define FIRST_RET_REG .a[0]
-	#define SECOND_RET_REG .a[1]
+	#define PARAM_BY_ARCH(opt1, opt2) opt2
 #else
 	#error "Unsupported ISA"
 #endif
+
+#define SYSCALL_INS_SIZE PARAM_BY_ARCH(2, 4)
+#define JUMP_INS_SIZE PARAM_BY_ARCH(5,8)
+#define SYSCALL_NR PARAM_BY_ARCH(context->rax,context->a[7])
+#define FIRST_ARG_REG PARAM_BY_ARCH(context->rdi,context->a[0])
+#define SECOND_ARG_REG PARAM_BY_ARCH(context->rsi,context->a[1])
+#define THIRD_ARG_REG PARAM_BY_ARCH(context->rdx,context->a[2])
+#define FOURTH_ARG_REG PARAM_BY_ARCH(context->r10,context->a[3])
+#define FIFTH_ARG_REG PARAM_BY_ARCH(context->r8,context->a[4])
+#define SIXTH_ARG_REG PARAM_BY_ARCH(context->r9,context->a[5])
+#define FIRST_RET_REG PARAM_BY_ARCH(.rax,.a[0])
+#define SECOND_RET_REG PARAM_BY_ARCH(.rdx,.a[1])
 
 bool is_overwritable_nop(const struct intercept_disasm_result *ins);
 
