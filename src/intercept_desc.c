@@ -62,12 +62,12 @@ static int
 open_orig_file(const struct intercept_desc *desc)
 {
 	int fd;
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(SYS_open)
 	fd = syscall_no_intercept(SYS_open, desc->path, O_RDONLY);
-#elif defined(__riscv)
+#elif defined(SYS_openat)
 	fd = syscall_no_intercept(SYS_openat, AT_FDCWD, desc->path, O_RDONLY);
 #else
-	#error "Unsupported ISA"
+	#error "No open syscalls defined"
 #endif
 
 	xabort_on_syserror(fd, __func__);
@@ -580,10 +580,10 @@ get_min_address(void)
 
 	min_address = 0x10000; /* best guess */
 
-#if defined(__x86_64__) || defined(_M_X64)
+#if defined(SYS_open)
 	int fd = syscall_no_intercept(SYS_open, "/proc/sys/vm/mmap_min_addr",
 					O_RDONLY);
-#elif defined(__riscv)
+#elif defined(SYS_openat)
 	int fd = syscall_no_intercept(SYS_openat, AT_FDCWD, "/proc/sys/vm/mmap_min_addr",
 					O_RDONLY);
 #else
