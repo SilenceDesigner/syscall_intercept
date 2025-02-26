@@ -30,18 +30,25 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * execution of this test must be preloaded with the corresponding interception
+ * library, i.e. from the syscall_intercept/test directory
+ * LD_LIBRARY_PATH=.:../build LD_PRELOAD=intercept_sys_openat.so ./openat_test
+ */
+
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
+#include <assert.h>
 
 int main() {
-    int fd = openat(AT_FDCWD,"non_existing_original_file.txt", O_RDONLY);
-    char buf[128] = "Specified file doesn't exist - "
-                    "Test is ok if next line is printed before this one as well:\n"
-                    "Proof of openat interception\n";
-    if (fd >= 0) {
-        write(1, "Success: File opened\n", 21);
-    } else {
-        write(1, buf, strlen(buf));
-    }
+    int create_fd = openat(AT_FDCWD, "testfile.txt", O_CREAT | O_TRUNC | O_RDONLY);
+    int test_fd = openat(AT_FDCWD, "non_existing.txt", O_RDONLY);
+    char buf[128] = "impossible write rerouted on testfile.txt";
+    write(test_fd, buf, strlen(buf));
+    char test_buf[128];
+    read(create_fd, test_buf, strlen(buf));
+    assert(strcmp(test_buf, buf) == 0);
+    write(1,"OPENAT TEST - OK\n",17);
+    return 0;
 }

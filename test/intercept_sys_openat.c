@@ -32,7 +32,9 @@
 
 #include "libsyscall_intercept_hook_point.h"
 #include <syscall.h>
-#include <unistd.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdint.h>
 
 
 static int hook(long syscall_number,
@@ -41,8 +43,17 @@ static int hook(long syscall_number,
                 long arg4, long arg5,
                 long *result)
 {
+
     if (syscall_number == SYS_openat) {
-  	    write(1,"Proof of openat interception\n",29);
+        const char non_existing[] = "non_existing.txt";
+        const char *tmp = non_existing;
+        if (strcmp((char *)arg1, tmp) == 0) {
+            const char testfile[] = "testfile.txt";
+            long flags = O_RDWR;
+            *result = syscall_no_intercept(SYS_openat,arg0,(uintptr_t)testfile,
+                                           flags,arg3,arg4,arg5);
+            return 0;
+        }
     }
     return 1;
 }
