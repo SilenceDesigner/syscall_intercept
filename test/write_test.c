@@ -30,10 +30,33 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * execution of this test must be preloaded with the corresponding interception
+ * library, i.e. from the syscall_intercept/test directory
+ * LD_LIBRARY_PATH=.:../build LD_PRELOAD=intercept_sys_write.so ./write_test
+ */
+
 #include <unistd.h>
 #include <string.h>
+#include <stdio.h>
+#include <fcntl.h>
+#include <assert.h>
+#include <errno.h>
 
 int main() {
-    char buf[128] = "original_syscall\n";
-    write(1, buf, strlen(buf));
+	int test_fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC);
+	if (test_fd == -1) {
+		printf("intercepted_openat error nr: %d\n", errno);
+		return 1;
+	}
+	char buf[128] = "original_syscall\n";
+	write(test_fd, buf, strlen(buf));
+    lseek(test_fd, 0, SEEK_SET);
+	char test_buf[128];
+    int n = read(test_fd, test_buf, strlen(buf));
+    test_buf[n] = '\0';
+    assert(strcmp(test_buf, "intercepted_call\n") == 0);
+    char test_ok[128] = "placeholder_TEST - OK\n";
+    write(1,test_ok,strlen(test_ok));
+    return 0;
 }
