@@ -47,7 +47,8 @@ int main() {
     char buf[128] = "impossible write rerouted on testfile.txt";
     write(test_fd, buf, strlen(buf));
     char test_buf[128];
-    read(create_fd, test_buf, strlen(buf));
+    int n = read(create_fd, test_buf, strlen(buf));
+    test_buf[n] = '\0';
     assert(strcmp(test_buf, buf) == 0);
     write(1,"OPENAT TEST - OK\n",17);
     return 0;
