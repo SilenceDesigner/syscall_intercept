@@ -38,7 +38,7 @@
 #include <fcntl.h>
 
 int main() {
-	struct statx stx;
+    struct statx stx;
     int ret = syscall(SYS_statx, AT_FDCWD, "testfile.txt", 0, STATX_ALL, &stx);
 
     if (ret == -1) {

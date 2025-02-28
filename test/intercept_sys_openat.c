@@ -30,6 +30,11 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * see openat_test.c for details about this test library, which must be compiled with
+ * gcc -o intercept_sys_openat.so intercept_sys_write.c -I../include -L../build -lsyscall_intercept -fpic -shared
+ */
+
 #include "libsyscall_intercept_hook_point.h"
 #include <syscall.h>
 #include <fcntl.h>
