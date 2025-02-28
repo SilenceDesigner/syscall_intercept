@@ -133,7 +133,7 @@ which is a C function. This function would attempt to log the result of the sysc
 then proceed to return to the calling side, which involves restoring the saved
 registers. But the saved registers would be restored from a location
 relative to the stack pointer. The result would be reading unspecified values
-form the new stack location, and very likely a page fault.
+from the new stack location, and very likely a page fault.
   To avoid this problem, this sort of clone syscall is not executed in the C
 function. Instead, the C function returns without executing the syscall, and
 of course without logging its result. It asks the assembly wrapper code to

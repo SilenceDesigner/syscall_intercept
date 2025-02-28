@@ -236,6 +236,7 @@ void activate_patches(struct intercept_desc *desc);
 #define SYSCALL_INS_SIZE PARAM_BY_ARCH(2, 4)
 #define JUMP_INS_SIZE PARAM_BY_ARCH(5,8)
 #define SYSCALL_NR PARAM_BY_ARCH(context->rax,context->a[7])
+#define THREAD_PID PARAM_BY_ARCH(context->rax,context->a[0])
 #define FIRST_ARG_REG PARAM_BY_ARCH(context->rdi,context->a[0])
 #define SECOND_ARG_REG PARAM_BY_ARCH(context->rsi,context->a[1])
 #define THIRD_ARG_REG PARAM_BY_ARCH(context->rdx,context->a[2])

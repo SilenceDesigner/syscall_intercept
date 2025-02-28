@@ -731,13 +731,13 @@ intercept_routine(struct context *context)
 struct wrapper_ret
 intercept_routine_post_clone(struct context *context)
 {
-	if (SYSCALL_NR == 0) {
+	if (THREAD_PID == 0) {
 		if (intercept_hook_point_clone_child != NULL)
 			intercept_hook_point_clone_child();
 	} else {
 		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(SYSCALL_NR);
+			intercept_hook_point_clone_parent(THREAD_PID);
 	}
 
-	return (struct wrapper_ret){FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 1 };
+	return (struct wrapper_ret){FIRST_RET_REG = THREAD_PID, SECOND_RET_REG = 1 };
 }
