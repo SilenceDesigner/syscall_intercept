@@ -44,15 +44,15 @@
 #include <errno.h>
 
 int main() {
-	int test_fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
-	if (test_fd == -1) {
-		printf("intercepted_openat error nr: %d\n", errno);
-		return 1;
-	}
-	char buf[128] = "original_syscall\n";
-	write(test_fd, buf, strlen(buf));
+    int test_fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    if (test_fd == -1) {
+        printf("intercepted_openat error nr: %d\n", errno);
+        return 1;
+    }
+    char buf[128] = "original_syscall\n";
+    write(test_fd, buf, strlen(buf));
     lseek(test_fd, 0, SEEK_SET);
-	char test_buf[128];
+    char test_buf[128];
     int n = read(test_fd, test_buf, strlen(buf));
     test_buf[n] = '\0';
     assert(strcmp(test_buf, "intercepted_call\n") == 0);

@@ -57,13 +57,13 @@ static void hook_clone_parent(long child_pid)
 static void hook_clone_child(void)
 {
     int fd = openat(AT_FDCWD, "../testfile.txt", O_WRONLY);
-	dprintf(fd, "%d\n", getpid());
+    dprintf(fd, "%d\n", getpid());
 }
 
 static __attribute__((constructor)) void
 init(void)
 {
     intercept_hook_point = hook;
-	intercept_hook_point_clone_child = hook_clone_child;
+    intercept_hook_point_clone_child = hook_clone_child;
     intercept_hook_point_clone_parent = hook_clone_parent;
 }
