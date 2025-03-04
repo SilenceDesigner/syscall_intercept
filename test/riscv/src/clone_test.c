@@ -65,7 +65,13 @@ int main() {
         return 1;
     }
 
-    wait(NULL);
+    int status;
+    wait(&status);
+    if (WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT) {
+        fprintf(stderr, "Child assertion failed\n");
+        return 1;
+    }
+
     char buf[128];
     int n = read(fd2, buf, sizeof(buf));
     buf[n] = '\0';
