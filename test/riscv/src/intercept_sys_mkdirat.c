@@ -45,12 +45,12 @@ static int hook(long syscall_number,
                 long arg4, long arg5,
                 long *result)
 {
-    if (syscall_number == SYS_mkdir) {
+    if (syscall_number == SYS_mkdirat) {
         char buf[128] = "../wrongdir/";
         char *tmp = buf;
-        if (strcmp((char *)arg0, tmp) == 0) {
+        if (strcmp((char *)arg1, tmp) == 0) {
             const char testdir[] = "../testdir/";
-            syscall_no_intercept(syscall_number, (uintptr_t)testdir, arg1, arg2,
+            syscall_no_intercept(syscall_number, arg0, (uintptr_t)testdir, arg2,
                                  arg3, arg4, arg5);
             return 0;
         }
