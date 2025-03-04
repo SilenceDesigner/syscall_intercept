@@ -47,10 +47,10 @@
 #include <sys/stat.h>
 
 int main() {
-    mkdir("../wrongdir/", 0777);
+    mkdirat(AT_FDCWD,"../wrongdir/", 0777);
     int fd = openat(AT_FDCWD, "../testdir/testdirfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     assert(fd != -1);
     system("rm -rf ../testdir/");
-    write(1, "MKDIR TEST - OK\n", 16);
+    write(1, "MKDIRAT TEST - OK\n", 16);
     return 0;
 }

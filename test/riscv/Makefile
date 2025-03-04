@@ -13,14 +13,14 @@ LD_PRELOAD = ./build
 
 TESTS = clone \
 		fcntl \
-		mkdir \
+		mkdirat \
 		openat \
 		read \
 		statx \
 		write
 
 
-EXECUTABLES = $(BIN_DIR)/mkdir_test \
+EXECUTABLES = $(BIN_DIR)/mkdirat_test \
 			  $(BIN_DIR)/clone_test \
 			  $(BIN_DIR)/fcntl_test \
 			  $(BIN_DIR)/openat_test \
@@ -28,7 +28,7 @@ EXECUTABLES = $(BIN_DIR)/mkdir_test \
 			  $(BIN_DIR)/statx_test \
 			  $(BIN_DIR)/write_test
 
-INTERCEPT_LIBS = $(BUILD_DIR)/intercept_sys_mkdir.so \
+INTERCEPT_LIBS = $(BUILD_DIR)/intercept_sys_mkdirat.so \
 				 $(BUILD_DIR)/intercept_sys_clone.so \
 				 $(BUILD_DIR)/intercept_sys_fcntl.so \
 				 $(BUILD_DIR)/intercept_sys_openat.so \
