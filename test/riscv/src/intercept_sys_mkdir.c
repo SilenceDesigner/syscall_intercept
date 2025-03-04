@@ -31,24 +31,27 @@
  */
 
 #include "libsyscall_intercept_hook_point.h"
+
 #include <syscall.h>
 #include <unistd.h>
+#include <stdio.h>
 
-static int
-hook(long syscall_number,
-     long arg0, long arg1,
-     long arg2, long arg3,
-     long arg4, long arg5,
-     long *result)
+
+static int hook(long syscall_number,
+                long arg0, long arg1,
+                long arg2, long arg3,
+                long arg4, long arg5,
+                long *result)
 {
-  if (syscall_number == SYS_fcntl) {
-    write(1,"Proof of fcntl64 interception\n",30);
-  }
-  return 1;
+    if (syscall_number == SYS_brk) {
+        *result = syscall_no_intercept(syscall_number, 0, arg1, arg2, arg3, arg4, arg5, result);
+        return 0;
+//        printf("Brk arg0 %p\n", (void *)arg0);
+    }
+    return 1;
 }
 
-static __attribute__((constructor)) void
-init(void)
+static __attribute__((constructor)) void init(void)
 {
     intercept_hook_point = hook;
 }
