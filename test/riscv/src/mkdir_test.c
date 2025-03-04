@@ -30,19 +30,38 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * The following test assumes 4096 bytes as the smallest page size. It
+ * therefore makes sense on those architectures compliant with that
+ * assumption, as both amd64 and riscv64 are. Following that assumption,
+ * a brk(0) would result in an increase of the program break by 4096 bytes
+ */
+
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
+#include <fcntl.h>
+#include <errno.h>
+#include <assert.h>
+#include <stdlib.h>
 
 int main() {
     void *old_brk = sbrk(0); // Get current program break
+    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     printf("Old brk: %p\n", old_brk);
 
-    // Increase the program break
-    void *new_brk = old_brk + 4096; // Allocate one page
+    void *new_brk = old_brk + 8192; // Allocate two pages
+    dprintf(fd, "%p\n", new_brk);
+
     if (brk(new_brk) != 0) {
         perror("brk failed");
         return 1;
     }
-    printf("New brk: %p\n", new_brk);
+    char buf[128];
+    lseek(fd, 0, SEEK_SET);
+    int n = read(fd, &buf, sizeof(buf));
+    buf[n] = '\0';
+    n = atoi(buf);
+//    assert();
+    printf("New brk: %p\n", sbrk(0));
 }
