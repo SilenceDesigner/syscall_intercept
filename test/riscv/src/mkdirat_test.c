@@ -51,6 +51,6 @@ int main() {
     int fd = openat(AT_FDCWD, "../testdir/testdirfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     assert(fd != -1);
     system("rm -rf ../testdir/");
-    write(1, "MKDIRAT TEST - OK\n", 16);
+    write(1, "MKDIRAT TEST - OK\n", 18);
     return 0;
 }
