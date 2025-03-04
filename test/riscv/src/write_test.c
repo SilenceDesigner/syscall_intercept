@@ -44,7 +44,7 @@
 #include <errno.h>
 
 int main() {
-	int test_fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC);
+	int test_fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
 	if (test_fd == -1) {
 		printf("intercepted_openat error nr: %d\n", errno);
 		return 1;
@@ -56,7 +56,7 @@ int main() {
     int n = read(test_fd, test_buf, strlen(buf));
     test_buf[n] = '\0';
     assert(strcmp(test_buf, "intercepted_call\n") == 0);
-    char test_ok[128] = "placeholder_TEST - OK\n";
-    write(1,test_ok,strlen(test_ok));
+    char test_ok[128] = "WRITE TEST - OK\n";
+    write(1, test_ok, strlen(test_ok));
     return 0;
 }

@@ -34,6 +34,7 @@
 
 #include <syscall.h>
 #include <unistd.h>
+#include <string.h>
 
 
 static int hook(long syscall_number,
@@ -43,7 +44,13 @@ static int hook(long syscall_number,
                 long *result)
 {
     if (syscall_number == SYS_statx) {
-        write(1,"Proof of statx interception\n",28);
+        const char file2[] = "../testfile2.txt";
+        const char *tmp = file2;
+        if (strcmp((char *)arg1, tmp) == 0) {
+            const char testfile[] = "../testfile.txt";
+            syscall_no_intercept(syscall_number, arg0, testfile, arg2, arg3, arg4, arg5, result);
+            return 0;
+        }
     }
     return 1;
 }

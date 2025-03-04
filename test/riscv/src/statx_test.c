@@ -30,25 +30,27 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <unistd.h>
 #include <string.h>
 #include <stdio.h>
 #include <sys/syscall.h>
+#include <sys/stat.h>
 #include <linux/stat.h>
 #include <fcntl.h>
+#include <assert.h>
 
 int main() {
+    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     struct statx stx;
-    int ret = syscall(SYS_statx, AT_FDCWD, "testfile.txt", 0, STATX_ALL, &stx);
+    statx(AT_FDCWD, "../testfile.txt", 0, STATX_BASIC_STATS | STATX_BTIME, &stx);
 
-    if (ret == -1) {
-    	perror("statx failed");
-        return 1;
-    }
+    int fd2 = openat(AT_FDCWD, "../testfile2.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    struct statx stx2;
+    statx(AT_FDCWD, "../testfile2.txt", 0, STATX_BASIC_STATS | STATX_BTIME, &stx2);
 
-    printf("statx succeeded: inode = %llu, size = %llu bytes\n",
-        (unsigned long long)stx.stx_ino,
-        (unsigned long long)stx.stx_size);
+    assert(stx.stx_ino ==  stx2.stx_ino);
+    write(1, "STATX TEST - OK\n", 16);
 
     return 0;
 }
