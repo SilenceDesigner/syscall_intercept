@@ -33,6 +33,9 @@
 #include "libsyscall_intercept_hook_point.h"
 #include <stddef.h>
 #include <syscall.h>
+#include <fcntl.h>
+#include <string.h>
+#include <unistd.h>
 
 
 static int hook(long syscall_number,
@@ -47,21 +50,10 @@ static int hook(long syscall_number,
     (void)result;
 
     if (syscall_number == SYS_read) {
-        char *buf = (char *)arg1;
-        size_t len = (size_t)arg2;
-        const char interc[] = "intercepted_read\n";
-        const char *src = interc;
-
-        if (len > sizeof(interc)) {
-            *result = 0;
-            while (*src != '\0') {
-                *buf++ = *src++;
-                *result += 1;
-            }
-            *buf = '\0';
-            *result += 1;
-        }
-        return 0;
+        int fd = openat(AT_FDCWD, "../testfile.txt", O_WRONLY);
+        char buf[128] = "write from read hook\n";
+        write(fd, buf, strlen(buf));
+        lseek(fd, 0, SEEK_SET);
     }
     return 1;
 }

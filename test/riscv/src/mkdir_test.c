@@ -44,24 +44,13 @@
 #include <errno.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <sys/stat.h>
 
 int main() {
-    void *old_brk = sbrk(0); // Get current program break
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
-    printf("Old brk: %p\n", old_brk);
-
-    void *new_brk = old_brk + 8192; // Allocate two pages
-    dprintf(fd, "%p\n", new_brk);
-
-    if (brk(new_brk) != 0) {
-        perror("brk failed");
-        return 1;
-    }
-    char buf[128];
-    lseek(fd, 0, SEEK_SET);
-    int n = read(fd, &buf, sizeof(buf));
-    buf[n] = '\0';
-    n = atoi(buf);
-//    assert();
-    printf("New brk: %p\n", sbrk(0));
+    mkdir("../wrongdir/", 0777);
+    int fd = openat(AT_FDCWD, "../testdir/testdirfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    assert(fd != -1);
+    system("rm -rf ../testdir/");
+    write(1, "MKDIR TEST - OK\n", 16);
+    return 0;
 }

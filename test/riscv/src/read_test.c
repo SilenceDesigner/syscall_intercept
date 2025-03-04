@@ -32,9 +32,15 @@
 
 #include <unistd.h>
 #include <string.h>
+#include <fcntl.h>
+#include <assert.h>
 
 int main() {
+    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     char buf[128];
-    read(0, buf, sizeof(buf));
-    write(1, buf, strlen(buf));  // Should print "intercepted_read"
+    char expected_string[] = "write from read hook\n";
+    int n = read(fd, buf, strlen(expected_string));
+    buf[n] = '\0';
+    assert(strcmp(buf,expected_string) == 0);
+    write(1, "READ TEST - OK\n",15);
 }

@@ -35,6 +35,8 @@
 #include <syscall.h>
 #include <unistd.h>
 #include <stdio.h>
+#include <string.h>
+#include <stdint.h>
 
 
 static int hook(long syscall_number,
@@ -43,10 +45,15 @@ static int hook(long syscall_number,
                 long arg4, long arg5,
                 long *result)
 {
-    if (syscall_number == SYS_brk) {
-        *result = syscall_no_intercept(syscall_number, 0, arg1, arg2, arg3, arg4, arg5, result);
-        return 0;
-//        printf("Brk arg0 %p\n", (void *)arg0);
+    if (syscall_number == SYS_mkdir) {
+        char buf[128] = "../wrongdir/";
+        char *tmp = buf;
+        if (strcmp((char *)arg0, tmp) == 0) {
+            const char testdir[] = "../testdir/";
+            syscall_no_intercept(syscall_number, (uintptr_t)testdir, arg1, arg2,
+                                 arg3, arg4, arg5);
+            return 0;
+        }
     }
     return 1;
 }

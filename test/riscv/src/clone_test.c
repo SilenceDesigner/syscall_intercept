@@ -36,27 +36,42 @@
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <assert.h>
+#include <fcntl.h>
+#include <string.h>
+#include <stdlib.h>
 
 int child_func(void *arg) {
-    printf("Child process callback function: PID = %d\n", getpid());
+    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDONLY);
+    char buf[128];
+    int n = read(fd, buf, strlen(buf));
+    buf[n] = '\0';
+    n = atoi(buf);
+    assert(n == getpid());
     return 0;
 }
 
 int main() {
-    char child_stack[8192]; // Stack for the child process
+    int fd = openat(AT_FDCWD, "../testfile.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
+    int fd2 = openat(AT_FDCWD, "../testfile2.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
 
-    printf("Parent process: PID = %d\n", getpid());
+    char child_stack[8192];
 
     pid_t pid = clone(child_func, child_stack + sizeof(child_stack),
                       CLONE_VM | SIGCHLD, NULL);
 
     if (pid == -1) {
-        perror("clone failed");
+        perror("Clone failed");
         return 1;
     }
 
-    printf("clone() returned PID: %d\n", pid);
     wait(NULL);
+    char buf[128];
+    int n = read(fd2, buf, sizeof(buf));
+    buf[n] = '\0';
+    n = atoi(buf);
+    assert(n == getpid());
+    write(1, "CLONE TEST - OK\n", 16);
     return 0;
 }
 
