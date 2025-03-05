@@ -50,10 +50,10 @@ static int hook(long syscall_number,
 {
 
     if (syscall_number == SYS_openat) {
-        const char non_existing[] = "../non_existing.txt";
+        const char non_existing[] = "non_existing.txt";
         const char *tmp = non_existing;
         if (strcmp((char *)arg1, tmp) == 0) {
-            const char testfile[] = "../testfile.txt";
+            const char testfile[] = "testfile.txt";
             long flags = O_WRONLY;
             *result = syscall_no_intercept(SYS_openat, arg0, (uintptr_t)testfile,
                                            flags, arg3, arg4, arg5);

@@ -36,8 +36,8 @@
 #include <assert.h>
 
 int main() {
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
-    int fd2 = openat(AT_FDCWD, "../testfile2.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fd2 = openat(AT_FDCWD, "testfile2.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     int fd2_dup = fcntl(fd2, F_DUPFD, 0);
     char buf[128] = "writing to fd2_dup\n";
     write(fd2_dup, buf, strlen(buf));

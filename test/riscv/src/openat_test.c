@@ -42,8 +42,8 @@
 #include <assert.h>
 
 int main() {
-    int create_fd = openat(AT_FDCWD, "../testfile.txt", O_CREAT | O_TRUNC | O_RDONLY, 0666);
-    int test_fd = openat(AT_FDCWD, "../non_existing.txt", O_RDONLY);
+    int create_fd = openat(AT_FDCWD, "testfile.txt", O_CREAT | O_TRUNC | O_RDONLY, 0666);
+    int test_fd = openat(AT_FDCWD, "non_existing.txt", O_RDONLY);
     char buf[128] = "impossible write rerouted on testfile.txt";
     write(test_fd, buf, strlen(buf));
     char test_buf[128];

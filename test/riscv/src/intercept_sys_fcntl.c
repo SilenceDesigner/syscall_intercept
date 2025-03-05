@@ -43,7 +43,7 @@ hook(long syscall_number,
      long *result)
 {
     if (syscall_number == SYS_fcntl) {
-        int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+        int fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
         int ret = syscall_no_intercept(syscall_number, fd, arg1, arg2, arg3, arg4, arg5);
         *result = ret;
         return 0;
