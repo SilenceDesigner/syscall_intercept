@@ -50,7 +50,7 @@ static int hook(long syscall_number,
     (void)result;
 
     if (syscall_number == SYS_read) {
-        int fd = openat(AT_FDCWD, "../testfile.txt", O_WRONLY);
+        int fd = openat(AT_FDCWD, "testfile.txt", O_WRONLY);
         char buf[128] = "write from read hook\n";
         write(fd, buf, strlen(buf));
         lseek(fd, 0, SEEK_SET);

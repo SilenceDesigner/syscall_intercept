@@ -50,13 +50,13 @@ static int hook(long syscall_number,
 
 static void hook_clone_parent(long child_pid)
 {
-    int fd = openat(AT_FDCWD, "../testfile2.txt", O_WRONLY);
+    int fd = openat(AT_FDCWD, "testfile2.txt", O_WRONLY);
     dprintf(fd, "%d\n", getpid());
 }
 
 static void hook_clone_child(void)
 {
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_WRONLY);
+    int fd = openat(AT_FDCWD, "testfile.txt", O_WRONLY);
     dprintf(fd, "%d\n", getpid());
 }
 

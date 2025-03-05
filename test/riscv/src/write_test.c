@@ -44,7 +44,7 @@
 #include <errno.h>
 
 int main() {
-    int test_fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int test_fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     if (test_fd == -1) {
         printf("intercepted_openat error nr: %d\n", errno);
         return 1;

@@ -42,7 +42,7 @@
 #include <stdlib.h>
 
 int child_func(void *arg) {
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDONLY);
+    int fd = openat(AT_FDCWD, "testfile.txt", O_RDONLY);
     char buf[128];
     int n = read(fd, buf, strlen(buf));
     buf[n] = '\0';
@@ -52,8 +52,8 @@ int child_func(void *arg) {
 }
 
 int main() {
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
-    int fd2 = openat(AT_FDCWD, "../testfile2.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
+    int fd = openat(AT_FDCWD, "testfile.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
+    int fd2 = openat(AT_FDCWD, "testfile2.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
 
     char child_stack[8192];
 

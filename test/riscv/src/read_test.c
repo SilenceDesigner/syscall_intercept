@@ -36,7 +36,7 @@
 #include <assert.h>
 
 int main() {
-    int fd = openat(AT_FDCWD, "../testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
+    int fd = openat(AT_FDCWD, "testfile.txt", O_RDWR | O_CREAT | O_TRUNC, 0666);
     char buf[128];
     char expected_string[] = "write from read hook\n";
     int n = read(fd, buf, strlen(expected_string));
