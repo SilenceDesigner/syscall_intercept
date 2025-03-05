@@ -44,7 +44,7 @@
 int child_func(void *arg) {
     int fd = openat(AT_FDCWD, "testfile.txt", O_RDONLY);
     char buf[128];
-    int n = read(fd, buf, strlen(buf));
+    int n = read(fd, buf, sizeof(buf));
     buf[n] = '\0';
     n = atoi(buf);
     assert(n == getpid());
