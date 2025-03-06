@@ -56,13 +56,17 @@ There is an install target. For now, all it does, is cp.
 make install
 ```
 
-[//]: # (Coming soon:)
+Testing on **x86_64**:
+```shell
+make test
+```
 
-[//]: # (```sh)
-
-[//]: # (make test)
-
-[//]: # (```)
+Testing on **RISC-V**:\
+Go to `syscall_intercept/test/riscv/`, then
+```shell
+make
+make test
+```
 
 # Synopsis #
 
@@ -313,7 +317,8 @@ aa20a: bltu     a5,a0,aa262 <__open+0xaa>   | aa20a: bltu     a5,a0,aa262 <__ope
 with some other libc implementations as well
 * RISC-V version assumes `$t6` is not used as base pointer or as source
 register without being reinitialized after an `ecall` and before the ending of
-a function (tested with glibc 2.35, 2.37 and 2.39)
+a function - tested with glibc 2.35, 2.37 and 2.39
+* **Clone** handling on **RISC-V** is work in progress
 
 # Debugging: #
 Besides logging, the most important factor during debugging is to make
