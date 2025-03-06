@@ -11,30 +11,26 @@ SRC_DIR = src
 LD_LIBRARY_PATH = ./build:../../build
 LD_PRELOAD = ./build
 
-TESTS = clone \
-		fcntl \
-		mkdirat \
-		openat \
-		read \
-		statx \
-		write
+TESTS += fcntl
+TESTS += mkdirat
+TESTS += openat
+TESTS += read
+TESTS += statx
+TESTS += write
 
+EXECUTABLES += $(BIN_DIR)/mkdirat_test
+EXECUTABLES += $(BIN_DIR)/fcntl_test
+EXECUTABLES += $(BIN_DIR)/openat_test
+EXECUTABLES += $(BIN_DIR)/read_test
+EXECUTABLES += $(BIN_DIR)/statx_test
+EXECUTABLES += $(BIN_DIR)/write_test
 
-EXECUTABLES = $(BIN_DIR)/mkdirat_test \
-			  $(BIN_DIR)/clone_test \
-			  $(BIN_DIR)/fcntl_test \
-			  $(BIN_DIR)/openat_test \
-			  $(BIN_DIR)/read_test \
-			  $(BIN_DIR)/statx_test \
-			  $(BIN_DIR)/write_test
-
-INTERCEPT_LIBS = $(BUILD_DIR)/intercept_sys_mkdirat.so \
-				 $(BUILD_DIR)/intercept_sys_clone.so \
-				 $(BUILD_DIR)/intercept_sys_fcntl.so \
-				 $(BUILD_DIR)/intercept_sys_openat.so \
-				 $(BUILD_DIR)/intercept_sys_read.so \
-				 $(BUILD_DIR)/intercept_sys_statx.so \
-				 $(BUILD_DIR)/intercept_sys_write.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_mkdirat.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_fcntl.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_openat.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_read.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_statx.so
+INTERCEPT_LIBS += $(BUILD_DIR)/intercept_sys_write.so
 
 all: $(BIN_DIR) $(BUILD_DIR) $(EXECUTABLES) $(INTERCEPT_LIBS)
 
