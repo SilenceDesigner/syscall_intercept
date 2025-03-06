@@ -69,9 +69,9 @@
  *
  */
 
-#include "../../intercept.h"
-#include "../../intercept_util.h"
-#include "../../intercept_log.h"
+#include <intercept.h>
+#include <intercept_util.h>
+#include <intercept_log.h>
 
 #include <assert.h>
 #include <stdint.h>
@@ -123,7 +123,7 @@ create_absolute_jump(unsigned char *from, void *to)
 	instructions[20] = 0x01013e03; // ld t3, 16(sp)
 	instructions[21] = 0x02010113; // addi sp, sp, 32
 	instructions[22] = 0x000f8067; // jalr zero, t6, 0
-    // next call writes five 4-byte instructions starting from instructions[4]
+    	// next call writes five 4-byte instructions starting from instructions[4]
 	create_load_uint64t_into_t6((uint8_t *)(instructions + 4),(uint64_t)to);
 	return (unsigned char *)(instructions + 23);
 }
@@ -243,7 +243,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 			 * Check the instructions surrounding the syscall instruction.
 			 * If they can be relocated, then they can be overwritten.
 			 * Of course some instructions depend on the value of the
-             * PC register, these can not be relocated.
+             		 * PC register, these can not be relocated.
 			 */
 
 			check_surrounding_instructions(desc, patch);
@@ -319,11 +319,11 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				patch->return_address = patch->syscall_addr +  SYSCALL_INS_SIZE;
 			}
 
-            /* The following happens when we found 6 suitable bytes for
-             * rewriting and a 4-byte instruction is found after those,
+			/* The following happens when we found 6 suitable bytes for
+			 * rewriting and a 4-byte instruction is found after those,
 			 * resulting in patch size being 10 bytes but just 8 are used so
 			 * padding with a c.ebreak will be reasonable
-             */
+			 */
 			if (length > JUMP_INS_SIZE) {
 				patch->padding_is_needed = true;
 			}
@@ -347,16 +347,16 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 				char buffer[0x1000];
 
 				int l = snprintf(buffer, sizeof(buffer),
-					"unintercepted syscall at: %s 0x%lx\n",
+					"unintercepted ecall at: %s 0x%lx\n",
 					desc->path,
 					patch->syscall_offset);
 
 				intercept_log(buffer, (size_t)l);
-				debug_dump("unintercepted syscall at: %s 0x%lx\n",
+				debug_dump("unintercepted ecall at: %s 0x%lx\n",
 					desc->path,
 					patch->syscall_offset);
 				xabort("not enough space for patching"
-				    " around syscal");
+				    " around ecall");
 			}
 
 		mark_jump(desc, patch->return_address);
