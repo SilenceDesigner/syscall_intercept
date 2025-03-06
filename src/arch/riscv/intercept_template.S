@@ -50,7 +50,7 @@ intercept_asm_wrapper_tmpl:
     addi sp, sp, -72
     addi t6, sp, 72 # sp+72 is the sp value before interception
     sd t6, 0(sp) # original sp on stack
-    sd ra, 16(sp)
+    sd ra, 16(sp) # libc won't need to restore ra after just an ecall
     sd t0, 24(sp)
     sd t1, 32(sp)
     sd t2, 40(sp)
@@ -62,7 +62,7 @@ intercept_asm_wrapper_tmpl:
      * interception routine must be called. 1 for post_clone, 0 otherwise
      */
     li t5, 0 # choose intercept_routine
-    beqz t5, intercept_asm_wrapper_patch_desc_addr
+    j intercept_asm_wrapper_patch_desc_addr
 post_clone:
     addi sp, sp, -72
     addi t6, sp, 72 # sp+72 is the sp value before interception
