@@ -107,6 +107,7 @@ endif()
 
 # set the following directories according with your installation of capstone
 include_directories(include "/usr/local/include/capstone")
+include_directories(${PROJECT_SOURCE_DIR}/src)
 link_directories("/usr/local/lib")
 
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)

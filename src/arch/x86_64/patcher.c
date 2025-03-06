@@ -69,16 +69,14 @@
  *
  */
 
-#include "../../intercept.h"
-#include "../../intercept_util.h"
-#include "../../intercept_log.h"
+#include <intercept.h>
+#include <intercept_util.h>
+#include <intercept_log.h>
 
 #include <assert.h>
 #include <stdint.h>
-#include <syscall.h>
 #include <sys/mman.h>
 #include <string.h>
-
 #include <stdio.h>
 
 /* The size of a trampoline jump, jmp instruction + pointer */
@@ -482,7 +480,7 @@ create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst)
 
 				intercept_log(buffer, (size_t)l);
 				xabort("not enough space for patching"
-				    " around syscal");
+				    " around syscall");
 			}
 		}
 

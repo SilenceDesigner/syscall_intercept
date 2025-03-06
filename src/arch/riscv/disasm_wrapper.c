@@ -33,9 +33,9 @@
 
 #include <assert.h>
 #include <string.h>
-#include "../../disasm_wrapper.h"
+#include <disasm_wrapper.h>
 
-#include "../../capstone_wrapper.h"
+#include <capstone_wrapper.h>
 
 struct intercept_disasm_context {
 	csh handle;

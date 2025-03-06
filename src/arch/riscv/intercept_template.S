@@ -49,7 +49,7 @@
 intercept_asm_wrapper_tmpl:
     addi sp, sp, -72
     addi t6, sp, 72 # sp+72 is the sp value before interception
-    sd t6, 0(sp)
+    sd t6, 0(sp) # original sp on stack
     sd ra, 16(sp)
     sd t0, 24(sp)
     sd t1, 32(sp)
@@ -57,6 +57,10 @@ intercept_asm_wrapper_tmpl:
     sd t3, 48(sp)
     sd t4, 56(sp)
     sd t5, 64(sp)
+    /*
+     * t5 content will be evaluated in intercept_wrapper to determine which
+     * interception routine must be called. 1 for post_clone, 0 otherwise
+     */
     li t5, 0 # choose intercept_routine
     beqz t5, intercept_asm_wrapper_patch_desc_addr
 post_clone:
@@ -71,25 +75,12 @@ post_clone:
     sd t4, 56(sp)
     sd t5, 64(sp)
     li t5, 1 # choose intercept_routine_post_clone
-#     j l4
-# l3:
-# l4:
-    # addi sp, sp, -64 # allocate stack for some locals
-    # sd t6, 0(sp) # original sp on stack
-    # sd ra, 16(sp) # patch->return_address on stack
-    # sd s0, 24(sp) # follows conventions by saving s0 on stack since we use it
-    # sd t0, 32(sp)
-    # sd t1, 40(sp)
-    # sd t2, 48(sp)
-    # sd t3, 56(sp)
-    # bnez t5, intercept_asm_wrapper_patch_desc_addr
-    # li s0, 0 # s0 as flag: 1 if we are going for post_clone, 0 otherwise
 intercept_asm_wrapper_patch_desc_addr:
     /* load patch_desc address in t0 */
 
     /*
-     * the 5 following instructions are placeholders for the correct ones which
-     * are overwritten in machine language by create_load_uint64t_into_t0()
+     * the 5 following instructions are an indication for the actual ones which
+     * are written in binary by create_load_uint64t_into_t0() in patcher.c:528
      *
      * lui t0, 0x00000
      * addi t0, t0, 0x000
@@ -99,7 +90,7 @@ intercept_asm_wrapper_patch_desc_addr:
      */
     .space 20, 0
 
-    /* the 9 following instructions load the 64-bit address in t0 */
+    /* the 9 following instructions compose the 64-bit address in t0 */
     lui t1, 0x7ffff
     ori t2, zero, 0x7ff
     slli t2, t2, 1
@@ -115,8 +106,8 @@ intercept_asm_wrapper_wrapper_level1_addr:
     /* load intercept_wrapper address in t0 */
 
     /*
-     * the 5 following instructions are placeholders for the correct ones which are
-     * written in machine language in create_load_uint64t_into_t0() in patcher.c
+     * the 5 following instructions are an indication for the actual ones which
+     * are written in binary by create_load_uint64t_into_t0() in patcher.c:529
      *
      * lui t0, 0x00000
      * ori t0, t0, 0x000
@@ -127,7 +118,7 @@ intercept_asm_wrapper_wrapper_level1_addr:
      */
     .space 20, 0
 
-    /* the 9 following instructions load the 64-bit address in t0 */
+    /* the 9 following instructions compose the 64-bit address in t0 */
     lui t1, 0x7ffff
     ori t2, zero, 0x7ff
     slli t2, t2, 1
@@ -156,7 +147,8 @@ intercept_asm_wrapper_wrapper_level1_addr:
 
     /*
      * The intercept_wrapper function did restore all registers to their
-     * original state, except for a0, sp and t6.
+     * original state, except for a0, sp, t5 and t6. sp and t5 have just been
+     * restored up here (lines 145-146).
      *
      * If t6 is zero, a0 contains a syscall number, and that syscall
      * is executed here.
@@ -164,44 +156,30 @@ intercept_asm_wrapper_wrapper_level1_addr:
      * If t6 is 2, a clone syscall is executed here.
      */
     beqz t6, execute_unhandled_ecall
-    addi sp, sp, -8
-    sd t0, 0(sp)
-    li t0, 1
-    beq t6, t0, handled_ecall
-    li t0, 2
-    beq t6, t0, execute_clone
-    ebreak # if t6 holds invalid value
-#     li a7, 94 /* exit_group if t6 contains an invalid value, */
-#     ecall 	  /* namely different from 0, 1 or 2 */
+    srli t6, t6, 1
+    beqz t6, handled_ecall
+    srli t6, t6, 1
+    beqz t6, execute_clone
+    #addi sp, sp, -8
+    #sd t0, 0(sp)
+    #li t0, 1
+    #beq t6, t0, handled_ecall
+    #li t0, 2
+    #beq t6, t0, execute_clone
+    ebreak # if t6 holds invalid value, i. e. different from 0, 1 or 2
+
 execute_clone:
-    ld t0, 0(sp)
-    addi sp, sp, 8
+    #ld t0, 0(sp)
+    #addi sp, sp, 8
     ecall
     j post_clone
 
-#     mv a7, a0
-#     ecall
-#     li t5, 1 /* choose intercept_routine_post_clone */
-#     li s0, 1 /* flag to signal we cloned, restoring sp will require adding 128 */
-#     j l0
-    # beqz s0, l5
-    # addi sp, sp, 64
-# l5:
-#     ld ra, 16(sp)
-#     ld s0, 24(sp)
-#     ld t0, 32(sp)
-#     ld t1, 40(sp)
-#     ld t2, 48(sp)
-#     ld t3, 56(sp)
-#     ld t5, 64(sp) # t5 was saved at what currently can be accessed with 64(sp)
-#     addi sp, sp, 72
 execute_unhandled_ecall:
-    # mv a7, a0 # a7 should still contain the original value which is syscall_nr
     ecall
     j intercept_asm_wrapper_tmpl_end
 handled_ecall:
-    ld t0, 0(sp)
-    addi sp, sp, 8
+    #ld t0, 0(sp)
+    #addi sp, sp, 8
 
 intercept_asm_wrapper_tmpl_end:
     /*
@@ -209,6 +187,6 @@ intercept_asm_wrapper_tmpl_end:
      *
      * This template must be appended here with a
      * jump back to the intercepted code, whic is written by
-     * create_absolute_jump(*dst, patch->return_address) in patcher.c
+     * create_absolute_jump(*dst, patch->return_address) in patcher.c:537
      *
      */
