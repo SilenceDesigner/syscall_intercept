@@ -160,17 +160,9 @@ intercept_asm_wrapper_wrapper_level1_addr:
     beqz t6, handled_ecall
     srli t6, t6, 1
     beqz t6, execute_clone
-    #addi sp, sp, -8
-    #sd t0, 0(sp)
-    #li t0, 1
-    #beq t6, t0, handled_ecall
-    #li t0, 2
-    #beq t6, t0, execute_clone
     ebreak # if t6 holds invalid value, i. e. different from 0, 1 or 2
 
 execute_clone:
-    #ld t0, 0(sp)
-    #addi sp, sp, 8
     ecall
     j post_clone
 
@@ -178,8 +170,6 @@ execute_unhandled_ecall:
     ecall
     j intercept_asm_wrapper_tmpl_end
 handled_ecall:
-    #ld t0, 0(sp)
-    #addi sp, sp, 8
 
 intercept_asm_wrapper_tmpl_end:
     /*
