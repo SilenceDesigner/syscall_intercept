@@ -318,7 +318,11 @@ with some other libc implementations as well
 * RISC-V version assumes `$t6` is not used as base pointer or as source
 register without being reinitialized after an `ecall` and before the ending of
 a function - tested with glibc 2.35, 2.37 and 2.39
-* **Clone** handling on **RISC-V** is work in progress
+* :warning: **Clone** is not fully handled on **RISC-V**. Whereas in x86_64
+   version it is possible to define post-clone hook functions for both the
+   parent and child threads, on RISC-V it is only possible to define a pre-clone
+   hook function therefore providing a similar interception to every other system
+   calls. An example is present in [intercept_sys_clone.c](test/riscv/src/intercept_sys_clone.c)
 
 # Debugging: #
 Besides logging, the most important factor during debugging is to make
