@@ -42,23 +42,21 @@
 #include <stdlib.h>
 
 int child_func(void *arg) {
+    pid_t ppid = *(pid_t *)arg;
     int fd = openat(AT_FDCWD, "testfile.txt", O_RDONLY);
     char buf[128];
     int n = read(fd, buf, sizeof(buf));
     buf[n] = '\0';
     n = atoi(buf);
-    assert(n == getpid());
+    assert(n == ppid);
     return 0;
 }
 
 int main() {
-    int fd = openat(AT_FDCWD, "testfile.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
-    int fd2 = openat(AT_FDCWD, "testfile2.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
-
     char child_stack[8192];
-
+    pid_t ppid = getpid();
     pid_t pid = clone(child_func, child_stack + sizeof(child_stack),
-                      CLONE_VM | SIGCHLD, NULL);
+                      CLONE_VM | SIGCHLD, &ppid);
 
     if (pid == -1) {
         perror("Clone failed");
@@ -72,11 +70,6 @@ int main() {
         return 1;
     }
 
-    char buf[128];
-    int n = read(fd2, buf, sizeof(buf));
-    buf[n] = '\0';
-    n = atoi(buf);
-    assert(n == getpid());
     write(1, "CLONE TEST - OK\n", 16);
     return 0;
 }

@@ -110,14 +110,8 @@ intercept_wrapper:
     /* argument passed to intercept_routine */
     mv a0, sp
 
-    li t0, 1
-    beq t5, t0, l0 # which function should be called?
-
     jal intercept_routine
-    j l1
-l0:
-    jal intercept_routine_post_clone
-l1:
+
     /*
      * At this point, the return value of the C
      * function (a struct wrapper_ret instance) is in a0, a1.

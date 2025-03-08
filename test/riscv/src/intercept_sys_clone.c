@@ -43,27 +43,14 @@ static int hook(long syscall_number,
                 long *result)
 {
     if (syscall_number == SYS_clone) {
-        printf("Clone intercepted - Flags: 0x%lx - PID: %d\n", arg0, getpid());
+        int fd = openat(AT_FDCWD, "testfile.txt", O_CREAT | O_TRUNC | O_RDWR, 0666);
+        dprintf(fd,"%d\n",getpid());
     }
     return 1;
-}
-
-static void hook_clone_parent(long child_pid)
-{
-    int fd = openat(AT_FDCWD, "testfile2.txt", O_WRONLY);
-    dprintf(fd, "%d\n", getpid());
-}
-
-static void hook_clone_child(void)
-{
-    int fd = openat(AT_FDCWD, "testfile.txt", O_WRONLY);
-    dprintf(fd, "%d\n", getpid());
 }
 
 static __attribute__((constructor)) void
 init(void)
 {
     intercept_hook_point = hook;
-    intercept_hook_point_clone_child = hook_clone_child;
-    intercept_hook_point_clone_parent = hook_clone_parent;
 }
