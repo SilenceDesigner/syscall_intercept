@@ -730,7 +730,7 @@ intercept_routine(struct context *context)
  * The routine called by an assembly wrapper when a clone syscall returns zero,
  * and a new stack pointer is used in the child thread.
  */
-#if defined(__x86_64__) || defined(_M_X64)
+
 struct wrapper_ret
 intercept_routine_post_clone(struct context *context)
 {
@@ -744,4 +744,3 @@ intercept_routine_post_clone(struct context *context)
 
 	return (struct wrapper_ret){FIRST_RET_REG = THREAD_PID, SECOND_RET_REG = 1 };
 }
-#endif
