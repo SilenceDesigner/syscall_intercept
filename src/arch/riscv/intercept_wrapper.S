@@ -136,7 +136,14 @@ l1:
     ld t3, 32(sp)
     ld t4, 40(sp)
 
-    /* no point in restoring in context values at 48(sp), 56(sp) and 64(sp) */
+    /*
+     * No point in restoring in context values at 48(sp) and 56(sp), while a0
+     * must be restored only if system call has not been handled yet
+     */
+    li a1, 1
+    beq t6, a1, handled_ecall
+    ld a0, 64(sp)
+handled_ecall:
     ld a1, 72(sp)
     ld a2, 80(sp)
     ld a3, 88(sp)
