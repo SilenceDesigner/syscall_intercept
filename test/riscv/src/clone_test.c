@@ -58,7 +58,7 @@ int main() {
     char child_stack[8192];
 
     pid_t pid = clone(child_func, child_stack + sizeof(child_stack),
-                      CLONE_VM | SIGCHLD, NULL);
+                      SIGCHLD, NULL);
 
     if (pid == -1) {
         perror("Clone failed");
