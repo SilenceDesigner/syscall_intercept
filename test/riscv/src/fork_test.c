@@ -63,9 +63,14 @@ int main() {
             buf2[n2] = '\0';
             n2 = atoi(buf2);
             assert(n2 == getpid());
-            siginfo_t info;
-            waitid(P_PID,pid,&info,0);
-            break;
+            int status;
+    	    wait(&status);
+    	    if (WIFSIGNALED(status) && WTERMSIG(status) == SIGABRT) {
+            	fprintf(stderr, "Child assertion failed\n");
+            	return 1;
+    	    }
+
+	    break;
     }
     return 0;
 }
