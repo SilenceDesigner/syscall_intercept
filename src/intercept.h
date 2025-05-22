@@ -211,7 +211,11 @@ void allocate_trampoline_table(struct intercept_desc *desc);
 void find_syscalls(struct intercept_desc *desc);
 
 void init_patcher(void);
-void create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst);
+#if defined(__x86_64__) || defined(_M_X64) || defined(__riscv)
+	void create_patch_wrappers(struct intercept_desc *desc, unsigned char **dst);
+#else
+	void create_patch_wrappers(struct intercept_desc *desc);
+#endif
 void mprotect_asm_wrappers(void);
 
 /*
