@@ -507,6 +507,7 @@ size_t page_size;
 static unsigned char asm_wrapper_space[0x100000];
 static unsigned char *next_asm_wrapper_space = asm_wrapper_space + PAGE_SIZE;
 
+#if !defined(__aarch64__) && !defined(_M_ARM64)
 static bool
 is_asm_wrapper_space_full(void)
 {
@@ -515,7 +516,6 @@ is_asm_wrapper_space_full(void)
 }
 
 
-#if !defined(__aarch64__) && !defined(_M_ARM64)
 	/*
 	 * mprotect_asm_wrappers
 	 * The code generated into the data segment at the asm_wrapper_space

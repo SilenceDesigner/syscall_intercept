@@ -46,6 +46,13 @@
 
 #include <capstone_wrapper.h>
 
+struct intercept_disasm_context {
+	csh handle;
+	cs_insn *insn;
+	const unsigned char *begin;
+	const unsigned char *end;
+};
+
 /*
  * intercept_disasm_next_instruction - Examines a single instruction
  * in a text section. This is only a wrapper around capstone specific code,
