@@ -735,7 +735,7 @@ intercept_routine(struct context *context)
 		    &result);
 #if defined(SYS_vfork)
 	if (desc.nr == SYS_vfork || desc.nr == SYS_rt_sigreturn) {
-#elif
+#else
 	if (desc.nr == SYS_rt_sigreturn) {
 #endif
 		/* can't handle these syscalls the normal way */

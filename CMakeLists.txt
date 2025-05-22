@@ -46,13 +46,20 @@ option(PERFORM_STYLE_CHECKS
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 	option(BUILD_TESTS "build and enable tests" ON)
 	option(BUILD_EXAMPLES "build examples" ON)
-elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64)$")
+	option(TREAT_WARNINGS_AS_ERRORS
+		"make the build fail on any warnings during compilation, or linking" ON)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
 	option(BUILD_TESTS "build and enable tests" OFF)
 	option(BUILD_EXAMPLES "build examples" OFF)
+	option(TREAT_WARNINGS_AS_ERRORS
+			"make the build fail on any warnings during compilation, or linking" ON)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64)$")
+	option(BUILD_TESTS "build and enable tests" OFF)
+	option(BUILD_EXAMPLES "build examples" OFF)
+	option(TREAT_WARNINGS_AS_ERRORS
+			"make the build fail on any warnings during compilation, or linking" OFF)
 endif()
 message("-- " ${CMAKE_SYSTEM_PROCESSOR} "detected as target architecture")
-option(TREAT_WARNINGS_AS_ERRORS
-	"make the build fail on any warnings during compilation, or linking" ON)
 option(EXPECT_SPURIOUS_SYSCALLS
 	"account for some unexpected syscalls in tests - enable while using sanitizers, gcov" OFF)
 option(STATIC_CAPSTONE "statically link libcapstone into the shared library" OFF)
