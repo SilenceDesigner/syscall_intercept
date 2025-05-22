@@ -46,10 +46,11 @@ option(PERFORM_STYLE_CHECKS
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 	option(BUILD_TESTS "build and enable tests" ON)
 	option(BUILD_EXAMPLES "build examples" ON)
-elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$" OR CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64)$")
 	option(BUILD_TESTS "build and enable tests" OFF)
 	option(BUILD_EXAMPLES "build examples" OFF)
 endif()
+message("-- " ${CMAKE_SYSTEM_PROCESSOR} "detected as target architecture")
 option(TREAT_WARNINGS_AS_ERRORS
 	"make the build fail on any warnings during compilation, or linking" ON)
 option(EXPECT_SPURIOUS_SYSCALLS
@@ -99,7 +100,6 @@ include(CheckLanguage)
 set(SOURCES_C
 	src/disasm_wrapper.c
 	src/intercept.c
-	src/intercept_desc.c
 	src/intercept_log.c
 	src/intercept_util.c
 	src/magic_syscalls.c
@@ -107,6 +107,7 @@ set(SOURCES_C
 
 if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 	set(SOURCES_C "${SOURCES_C}"
+		src/intercept_desc.c
 		src/arch/x86_64/disasm_wrapper.c
 		src/arch/x86_64/patcher.c)
 
@@ -117,6 +118,7 @@ if(CMAKE_SYSTEM_PROCESSOR MATCHES "^(x86(_64)?)$")
 	)
 elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
 	set(SOURCES_C "${SOURCES_C}"
+		src/intercept_desc.c
 		src/arch/riscv/disasm_wrapper.c
 		src/arch/riscv/patcher.c)
 
@@ -125,6 +127,16 @@ elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(riscv(32|64))$")
 		src/arch/riscv/intercept_wrapper.S
 		src/arch/riscv/util.S
 	)
+elseif (CMAKE_SYSTEM_PROCESSOR MATCHES "^(aarch64)$")
+	set(SOURCES_C "${SOURCES_C}"
+		src/arch/aarch64/intercept_desc.c
+		src/arch/aarch64/disasm_wrapper.c
+		src/arch/aarch64/patcher.c)
+
+	set(SOURCES_ASM
+		src/arch/aarch64/intercept_template.S
+		src/arch/aarch64/intercept_wrapper.S
+		src/arch/aarch64/util.S)
 endif()
 
 
