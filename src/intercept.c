@@ -621,6 +621,18 @@ get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 	sys->args[5] = SIXTH_ARG_REG;
 }
 
+void
+intercept_routine_post_clone_c(long a0)
+{
+	if (a0 == 0) {
+		if (intercept_hook_point_clone_child != NULL)
+			intercept_hook_point_clone_child();
+	} else {
+		if (intercept_hook_point_clone_parent != NULL)
+			intercept_hook_point_clone_parent(a0);
+	}
+}
+
 /*
  * intercept_routine(...)
  * This is the function called from the asm wrappers,
@@ -698,7 +710,7 @@ intercept_routine(struct context *context)
 		 * the clone_child_intercept_routine instead, executing
 		 * it on the new child threads stack, then returns to libc.
 		 */
-		if (desc.nr == SYS_clone /*&& desc.args[1] != 0*/) {
+		if (desc.nr == SYS_clone && desc.args[1] != 0) {
 			return (struct wrapper_ret){
 				FIRST_RET_REG = SYSCALL_NR, SECOND_RET_REG = 2 };
 		}
@@ -717,6 +729,10 @@ intercept_routine(struct context *context)
 					desc.args[3],
 					desc.args[4],
 					desc.args[5]);
+	}
+
+	if (desc.nr == SYS_clone) {
+		intercept_routine_post_clone_c(result);
 	}
 
 	intercept_log_syscall(patch, &desc, KNOWN, result);
