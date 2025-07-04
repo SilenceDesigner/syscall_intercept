@@ -76,6 +76,8 @@ void (*intercept_hook_point_clone_parent)(long)
 
 bool debug_dumps_on;
 
+// void intercept_routine_post_clone_c(long pid);
+
 void
 debug_dump(const char *fmt, ...)
 {
@@ -621,16 +623,23 @@ get_syscall_in_context(struct context *context, struct syscall_desc *sys)
 	sys->args[5] = SIXTH_ARG_REG;
 }
 
-void
-intercept_routine_post_clone_c(long a0)
+/*
+ * intercept_routine_post_clone
+ * The routine called by an assembly wrapper when a clone syscall returns zero,
+ * and a new stack pointer is used in the child thread.
+ */
+struct wrapper_ret
+intercept_routine_post_clone(struct context *context)
 {
-	if (a0 == 0) {
+	if (THREAD_PID == 0) {
 		if (intercept_hook_point_clone_child != NULL)
 			intercept_hook_point_clone_child();
 	} else {
 		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(a0);
+			intercept_hook_point_clone_parent(THREAD_PID);
 	}
+
+	return (struct wrapper_ret){FIRST_RET_REG = THREAD_PID, SECOND_RET_REG = 1 };
 }
 
 /*
@@ -729,31 +738,41 @@ intercept_routine(struct context *context)
 					desc.args[3],
 					desc.args[4],
 					desc.args[5]);
-	}
 
-	if (desc.nr == SYS_clone) {
-		intercept_routine_post_clone_c(result);
+		/*
+		 * Here clone calls with arg[1] == 0 are granted the execution
+		 * of their post_clone hook functions
+		 */
+		if (desc.nr == SYS_clone) {
+			THREAD_PID = result;
+			intercept_routine_post_clone(context);
+		}
+#ifdef SYS_clone3
+		else if (desc.nr == SYS_clone3) {
+			THREAD_PID = result;
+			intercept_routine_post_clone(context);
+		}
+#endif
 	}
 
 	intercept_log_syscall(patch, &desc, KNOWN, result);
 	return (struct wrapper_ret){ FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 }
 
-/*
- * intercept_routine_post_clone
- * The routine called by an assembly wrapper when a clone syscall returns zero,
- * and a new stack pointer is used in the child thread.
- */
-struct wrapper_ret
-intercept_routine_post_clone(struct context *context)
-{
-	if (THREAD_PID == 0) {
-		if (intercept_hook_point_clone_child != NULL)
-			intercept_hook_point_clone_child();
-	} else {
-		if (intercept_hook_point_clone_parent != NULL)
-			intercept_hook_point_clone_parent(THREAD_PID);
-	}
-
-	return (struct wrapper_ret){FIRST_RET_REG = THREAD_PID, SECOND_RET_REG = 1 };
-}
+// /*
+//  * intercept_routine_post_clone_c
+//  * The routine called by the C coded intercept_routine when a clone syscall is
+//  * intercepted but stack space is shared (arg[1] == 0) after the kernel
+//  * execution of the clone
+//  */
+// void
+// intercept_routine_post_clone_c(long pid)
+// {
+// 	if (pid == 0) {
+// 		if (intercept_hook_point_clone_child != NULL)
+// 			intercept_hook_point_clone_child();
+// 	} else {
+// 		if (intercept_hook_point_clone_parent != NULL)
+// 			intercept_hook_point_clone_parent(pid);
+// 	}
+// }
