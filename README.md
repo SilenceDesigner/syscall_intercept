@@ -1,5 +1,5 @@
 # syscall_intercept
-<hr>
+
 
 [//]: # ([![Build Status]&#40;https://travis-ci.org/pmem/syscall_intercept.svg&#41;]&#40;https://travis-ci.org/pmem/syscall_intercept&#41;)
 
@@ -12,7 +12,7 @@ Full-featured support for **aarch64** (ARM64) is **work in progress**.
 
 [![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 # Dependencies #
-<hr>
+
 
 ## Runtime dependencies ##
 
@@ -76,7 +76,7 @@ make test
 ```
 
 # Synopsis #
-<hr>
+
 
 ```c
 #include <libsyscall_intercept_hook_point.h>
@@ -195,7 +195,7 @@ ls: reading directory '.': Operation not supported
 ```
 
 # Under the hood: #
-<hr>
+
 
 ##### Assumptions: #####
 In order to handle syscalls in user space, the library relies
@@ -320,7 +320,7 @@ aa20a: bltu     a5,a0,aa262 <__open+0xaa>   | aa20a: bltu     a5,a0,aa262 <__ope
 ```
 
 # Limitations: #
-<hr>
+
 
 * Only Linux is supported
 * Only x86\_64 and RISC-V are supported
@@ -333,7 +333,7 @@ on different glibc version, i.e. 2.35, 2.37 and 2.39, and on different kernel
 implementations manifesting a consistent and working behaviour.
 
 # Debugging: #
-<hr>
+
 Besides logging, the most important factor during debugging is to make
 sure the system calls in the debugger are not intercepted. To achieve this, use
 the INTERCEPT_HOOK_CMDLINE_FILTER variable described above.
@@ -348,7 +348,7 @@ With this filtering, the intercepting library is not activated in the gdb
 process itself.
 
 # RISC-V porting #
-<hr>
+
 
 Ottavio Monticelli <ottavio.monticelli@unito.it> (Maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Maintainer) \
