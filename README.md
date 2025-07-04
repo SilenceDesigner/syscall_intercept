@@ -1,4 +1,5 @@
 # syscall_intercept
+<hr>
 
 [//]: # ([![Build Status]&#40;https://travis-ci.org/pmem/syscall_intercept.svg&#41;]&#40;https://travis-ci.org/pmem/syscall_intercept&#41;)
 
@@ -6,15 +7,20 @@
 
 [//]: # ([![Coverity Scan Build Status]&#40;https://scan.coverity.com/projects/12890/badge.svg&#41;]&#40;https://scan.coverity.com/projects/syscall_intercept&#41;)
 
-This repository contains a multi-architecture porting of [syscall_intercept](https://github.com/pmem/syscall_intercept) working on both x86_64 and RISC-V
+This repository contains a multi-architecture porting of [syscall_intercept](https://github.com/pmem/syscall_intercept) working on both **x86_64** and **RISC-V**.
+Full-featured support for **aarch64** (ARM64) is **work in progress**.
 
+[![License](https://img.shields.io/badge/License-BSD%203--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause)
 # Dependencies #
+<hr>
 
 ## Runtime dependencies ##
 
  * libcapstone -- the disassembly engine used under the hood
    (RISC-V support requires version **5.0** or higher, while apt installs version 4.0.2 by default, as february 2025).
-   Compiling capstone by hand will require setting [CMakeLists.txt](CMakeLists.txt#L109) accordingly 
+   Since a manual installation of capstone could not be automatically detected while compiling syscall_intercept, we made
+   sure that libcapstone 5.0.6 is **automatically compiled** from source during the syscall_intercept cmake execution.
+   In other words, you don't need to care about having and installing capstone at all on your system.
 
 ## Build dependencies ##
 
@@ -61,14 +67,16 @@ Testing on **x86_64**:
 make test
 ```
 
-Testing on **RISC-V**:\
-Go to `syscall_intercept/test/riscv/`, then
+Testing on **RISC-V**:
 ```shell
+# From the project root directory
+cd test/riscv/
 make
 make test
 ```
 
 # Synopsis #
+<hr>
 
 ```c
 #include <libsyscall_intercept_hook_point.h>
@@ -187,6 +195,7 @@ ls: reading directory '.': Operation not supported
 ```
 
 # Under the hood: #
+<hr>
 
 ##### Assumptions: #####
 In order to handle syscalls in user space, the library relies
@@ -311,16 +320,20 @@ aa20a: bltu     a5,a0,aa262 <__open+0xaa>   | aa20a: bltu     a5,a0,aa262 <__ope
 ```
 
 # Limitations: #
+<hr>
+
 * Only Linux is supported
 * Only x86\_64 and RISC-V are supported
 * Only tested with glibc, although perhaps it works
 with some other libc implementations as well
 * RISC-V version assumes `$t6` is not used as base pointer or as source
 register without being reinitialized after an `ecall` and before the ending of
-a function - tested with glibc 2.35, 2.37 and 2.39
-* **Clone** handling on **RISC-V** is work in progress
+a function. While this assumption involves heuristics, this choice was tested 
+on different glibc version, i.e. 2.35, 2.37 and 2.39, and on different kernel
+implementations manifesting a consistent and working behaviour.
 
 # Debugging: #
+<hr>
 Besides logging, the most important factor during debugging is to make
 sure the system calls in the debugger are not intercepted. To achieve this, use
 the INTERCEPT_HOOK_CMDLINE_FILTER variable described above.
@@ -335,8 +348,9 @@ With this filtering, the intercepting library is not activated in the gdb
 process itself.
 
 # RISC-V porting #
+<hr>
 
-Ottavio Monticelli <ottavio.monticelli@edu.unito.it> (Maintainer) \
+Ottavio Monticelli <ottavio.monticelli@unito.it> (Maintainer) \
 Marco Edoardo Santimaria <marcoedoardo.santimaria@unito.it> (Maintainer) \
 Marco Aldinucci <marco.aldinucci@unito.it> (Maintainer and Principal Investigator) \
 Iacopo Colonnelli <iacopo.colonnelli@unito.it> (Maintainer and Principal Investigator)
