@@ -76,8 +76,6 @@ void (*intercept_hook_point_clone_parent)(long)
 
 bool debug_dumps_on;
 
-// void intercept_routine_post_clone_c(long pid);
-
 void
 debug_dump(const char *fmt, ...)
 {
@@ -758,21 +756,3 @@ intercept_routine(struct context *context)
 	intercept_log_syscall(patch, &desc, KNOWN, result);
 	return (struct wrapper_ret){ FIRST_RET_REG = result, SECOND_RET_REG = 1 };
 }
-
-// /*
-//  * intercept_routine_post_clone_c
-//  * The routine called by the C coded intercept_routine when a clone syscall is
-//  * intercepted but stack space is shared (arg[1] == 0) after the kernel
-//  * execution of the clone
-//  */
-// void
-// intercept_routine_post_clone_c(long pid)
-// {
-// 	if (pid == 0) {
-// 		if (intercept_hook_point_clone_child != NULL)
-// 			intercept_hook_point_clone_child();
-// 	} else {
-// 		if (intercept_hook_point_clone_parent != NULL)
-// 			intercept_hook_point_clone_parent(pid);
-// 	}
-// }
