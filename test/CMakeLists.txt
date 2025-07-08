@@ -159,7 +159,7 @@ add_test(NAME "hook_with_shared"
 
 add_library(hook_test_preload_with_static SHARED
 	$<TARGET_OBJECTS:hook_test_preload_o>)
-target_link_libraries(hook_test_preload_with_static PRIVATE syscall_intercept_static)
+target_link_libraries(hook_test_preload_with_static PRIVATE syscall_intercept_static ${CAPSTONE_LIB_FOLDER}/libcapstone.so)
 add_test(NAME "hook_with_static"
 	COMMAND ${CMAKE_COMMAND}
 	-DTEST_EXTRA_PRELOAD=${TEST_EXTRA_PRELOAD}
@@ -339,7 +339,7 @@ add_test(NAME "syscall_format_logging"
 	COMMAND ${CMAKE_COMMAND}
 	-DTEST_EXTRA_PRELOAD=${TEST_EXTRA_PRELOAD}
 	-DTEST_PROG=$<TARGET_FILE:syscall_format>
-	-DLIB_FILE=
+	-DLIB_FILE=$<TARGET_FILE:syscall_intercept_shared>
 	-DMATCH_FILE=${CMAKE_CURRENT_SOURCE_DIR}/syscall_format.log.match
 	-DTEST_NAME=syscall_format_logging
 	${CHECK_LOG_COMMON_ARGS})
