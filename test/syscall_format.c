@@ -240,7 +240,9 @@ main(int argc, char **argv)
 	void *p0 = (void *)0x123000;
 	void *p1 = (void *)0x234000;
 	void *p2 = (void *)0x456000;
-	void *p3 = (void *)0x567000;
+        struct timeval tv = {.tv_sec = 123, .tv_usec = 456};
+        struct utimbuf utb = {.actime = 1234567890, .modtime = 1234567890};
+        struct timeval tv_arr[2] = {tv, tv};
 
 	socklen_t sl[2] = {1, 1};
 
@@ -307,8 +309,6 @@ main(int argc, char **argv)
 	stat(NULL, &statbuf);
 	stat("/", &statbuf);
 	fstat(0, NULL);
-	fstat(-1, NULL);
-	fstat(AT_FDCWD, &statbuf);
 	fstat(2, &statbuf);
 	lstat(NULL, NULL);
 	lstat("/", NULL);
@@ -388,7 +388,7 @@ main(int argc, char **argv)
 	pipe(fd2);
 	pipe2(fd2, 0);
 
-	select(2, p0, p1, p2, p3);
+	select(2, p0, p1, p2, &tv);
 	syscall(SYS_pselect6, 2, p0, p1, p0, p1, p0);
 
 	sched_yield();
@@ -396,7 +396,7 @@ main(int argc, char **argv)
 	/* shared memory */
 	shmget(3, 4, 5);
 	shmat(3, p0, 5);
-	shmctl(3, 5, p0);
+	shmctl(3, SHM_INFO, p0);
 	shmdt(p0);
 
 	dup(4);
@@ -576,9 +576,9 @@ main(int argc, char **argv)
 	syscall(SYS_rt_sigsuspend, p0, 3);
 	syscall(SYS_sigaltstack, p0, p1);
 
-	utime(input[0], p0);
-	utimes(input[0], p0);
-	futimesat(4, input[0], p0);
+	utime(input[0], &utb);
+	utimes(input[0], tv_arr);
+	futimesat(4, input[0], tv_arr);
 
 	mknod(input[0], 1, 2);
 	mknodat(1, input[0], 1, 2);

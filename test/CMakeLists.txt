@@ -44,6 +44,7 @@ set(CMAKE_ASM_CREATE_SHARED_LIBRARY ${CMAKE_C_CREATE_SHARED_LIBRARY})
 add_executable(asm_pattern asm_pattern.c
 		$<TARGET_OBJECTS:syscall_intercept_base_c>
 		$<TARGET_OBJECTS:syscall_intercept_base_asm>)
+target_link_libraries(asm_pattern PUBLIC ${CAPSTONE_LIB_FOLDER}/libcapstone.so)
 
 target_link_libraries(asm_pattern
 	PRIVATE ${CMAKE_DL_LIBS} ${capstone_LDFLAGS})
@@ -141,6 +142,7 @@ add_test(NAME "fork_logging"
 add_library(hook_test_preload_o OBJECT hook_test_preload.c)
 
 add_executable(hook_test hook_test.c)
+target_link_libraries(hook_test PUBLIC ${CAPSTONE_LIB_FOLDER}/libcapstone.so)
 
 add_library(hook_test_preload_with_shared SHARED
 	$<TARGET_OBJECTS:hook_test_preload_o>)
@@ -157,7 +159,7 @@ add_test(NAME "hook_with_shared"
 
 add_library(hook_test_preload_with_static SHARED
 	$<TARGET_OBJECTS:hook_test_preload_o>)
-target_link_libraries(hook_test_preload_with_static PRIVATE syscall_intercept_static)
+target_link_libraries(hook_test_preload_with_static PRIVATE syscall_intercept_static ${CAPSTONE_LIB_FOLDER}/libcapstone.so)
 add_test(NAME "hook_with_static"
 	COMMAND ${CMAKE_COMMAND}
 	-DTEST_EXTRA_PRELOAD=${TEST_EXTRA_PRELOAD}
